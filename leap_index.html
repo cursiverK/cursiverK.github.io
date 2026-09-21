@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My 例文学習アプリ</title>
+  <style>
+    :root {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --text-main: #1e293b;
+      --text-sub: #64748b;
+      --accent: #d97706;
+      --success: #059669;
+      --error: #e11d48;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+    .container { width: 100%; max-width: 420px; }
+    .panel { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .header h1 { font-size: 1.1rem; font-weight: bold; }
+    .badge { font-size: 0.75rem; background: #f1f5f9; padding: 4px 10px; border-radius: 20px; font-weight: 600; color: var(--text-sub); }
+    .status-offline { background: #fef3c7; color: #b45309; }
+    
+    .form-group { margin-bottom: 10px; font-size: 0.8rem; }
+    .form-group label { display: block; color: var(--text-sub); margin-bottom: 4px; font-weight: 600; }
+    .range-box { display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    input[type="number"], select, input[type="text"], input[type="password"], textarea {
+      width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none;
+    }
+    input[type="number"] { width: 60px; text-align: center; font-weight: bold; }
+    
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-secondary { background: #e2e8f0; color: var(--text-main); }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-sync { background: #0f172a; color: white; padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; }
+
+    .perspective { perspective: 1000px; height: 320px; width: 100%; cursor: pointer; }
+    .card-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.5s; }
+    .card-inner.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .card-front { background: #fff; text-align: center; }
+    .card-back { background: #0f172a; color: #fff; transform: rotateY(180deg); overflow-y: auto; text-align: left; }
+
+    .quiz-card { background: #fff; border-radius: 16px; padding: 20px; min-height: 320px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; }
+    .translation-box { background: #f8fafc; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; line-height: 1.4; margin-bottom: 12px; }
+    .hidden { display: none !important; }
+    .nav-buttons { display: flex; gap: 8px; margin-top: 16px; }
+    .nav-buttons .btn { flex: 1; }
+
+    .SRS-box { background: #e0e7ff; color: #3730a3; padding: 8px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- 🔒 ログイン画面 -->
+    <div id="authPanel" class="panel" style="text-align:center; padding: 32px 20px;">
+      <h2 style="font-size:1.2rem; margin-bottom:12px;">🔒 パスワード保護</h2>
+      <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:20px;">アプリを利用するにはパスワードを入力してください。</p>
+      <div style="margin-bottom:16px;">
+        <input type="password" id="passInput" placeholder="パスワードを入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') submitPassword()">
+      </div>
+      <button onclick="submitPassword()" class="btn" style="width:100%;">ログイン</button>
+      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden">❌ パスワードが違います</div>
+    </div>
+
+    <!-- 📚 メインアプリ画面（ログイン後に表示） -->
+    <div id="mainContainer" class="hidden">
+      <div class="panel">
+        <div class="header">
+          <h1>My 例文学習</h1>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="offlineBadge" class="badge hidden status-offline">オフライン</span>
+            <span id="counter" class="badge">0 / 0</span>
+          </div>
+        </div>
+
+        <!-- 教材切替ドロップダウン -->
+        <div class="form-group">
+          <label>📚 教材（スプレッドシート）</label>
+          <select id="bookSelect" onchange="switchBook()">
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>学習モード</label>
+          <select id="modeSelect" onchange="switchMode()">
+            <option value="srs">🔥 本日の復習（忘却曲線おすすめ）</option>
+            <option value="card">1. 単語カード（全例文・意味一覧）</option>
+            <option value="exCard">2. 例文フラッシュカード（和訳 ⇄ 英文）</option>
+            <option value="quiz">3. 例文 穴埋めクイズ（変化形）</option>
+            <option value="full">4. 例文全体 タイピング・書き取り</option>
+          </select>
+        </div>
+
+        <div id="rangeContainer" class="form-group hidden">
+          <div class="range-box">
+            <span style="color:var(--text-sub)">範囲:</span>
+            <input type="number" id="rangeFrom" min="1" placeholder="1">
+            <span>〜</span>
+            <input type="number" id="rangeTo" min="1" placeholder="Max">
+            <button onclick="applyRangeFilter()" class="btn btn-secondary" style="margin-left:auto;">指定実行</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <span id="bookStatus" style="font-size: 0.7rem; color: var(--text-sub);"></span>
+          <button onclick="syncDataWithGAS()" class="btn btn-sync">🔄 データ再同期</button>
+        </div>
+      </div>
+
+      <!-- 読込中 -->
+      <div id="loading" class="panel" style="text-align:center; padding:32px;">
+        <p style="color:var(--text-sub)">データを取得中...</p>
+      </div>
+
+      <!-- メインコンテンツ -->
+      <div id="app" class="hidden">
+
+        <div id="srsBox" class="SRS-box hidden">
+          <span id="srsInfo">次回復習: 今日</span>
+          <span id="srsInterval">間隔: 1日</span>
+        </div>
+
+        <!-- 1. 単語カード -->
+        <div id="cardMode" class="hidden">
+          <div class="perspective" onclick="flipCard('card')">
+            <div id="card" class="card-inner">
+              <div class="card-face card-front">
+                <span id="cardNoLabel" class="badge">No.---</span>
+                <div>
+                  <h2 id="cardWord" style="font-size: 2rem; margin-bottom: 12px;">---</h2>
+                  <button onclick="event.stopPropagation(); speakText(activeWords[currentIndex]?.word)" class="btn btn-secondary" style="font-size:0.75rem;">🔊 単語を発音</button>
+                </div>
+                <span style="font-size:0.75rem; color:var(--text-sub);">タップで裏返し</span>
+              </div>
+              <div class="card-face card-back">
+                <div>
+                  <span class="badge" style="background:#334155; color:#cbd5e1;">Meaning & All Examples</span>
+                  <div id="cardMeanings" style="margin-top:8px; font-weight:bold; color:#fef08a;"></div>
+                </div>
+                <div id="cardExamples" style="margin: 12px 0; font-size: 0.8rem; line-height: 1.5;"></div>
+                <div style="font-size:0.75rem; color:#64748b; text-align:center;">タップで戻る</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 例文フラッシュカード -->
+        <div id="exCardMode" class="hidden">
+          <div class="perspective" onclick="flipCard('exCard')">
+            <div id="exCard" class="card-inner">
+              <div class="card-face card-front">
+                <div class="header">
+                  <span id="exCardHeader" class="badge">例文カード</span>
+                  <span style="font-size:0.75rem; color:var(--text-sub);">表面（和訳）</span>
+                </div>
+                <p id="exCardTranslation" class="translation-box" style="margin:auto 0;">---</p>
+                <span style="font-size:0.75rem; color:var(--text-sub);">タップで英文を表示</span>
+              </div>
+              <div class="card-face card-back" style="background:#0f172a;">
+                <div class="header">
+                  <span id="exCardHeaderBack" class="badge" style="background:#334155; color:#fef08a;">---</span>
+                  <span style="font-size:0.75rem; color:#94a3b8;">裏面（英文）</span>
+                </div>
+                <div style="margin:auto 0; text-align:center;">
+                  <p id="exCardSentence" style="font-size:1.1rem; font-weight:bold; line-height:1.5; margin-bottom:16px;">---</p>
+                  <button onclick="event.stopPropagation(); speakText(getCurrentList()[currentIndex]?.example)" class="btn btn-secondary" style="font-size:0.75rem; background:#1e293b; color:#fef08a; border:1px solid #334155;">🔊 英文を聞く</button>
+                </div>
+                <span style="font-size:0.75rem; color:#64748b; text-align:center;">タップで表に戻る</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 穴埋めクイズ -->
+        <div id="quizMode" class="hidden">
+          <div class="quiz-card">
+            <div>
+              <div class="header">
+                <span id="quizHeaderLabel" class="badge">穴埋めクイズ</span>
+                <button onclick="toggleQuizHint()" style="background:none; border:none; color:var(--text-sub); text-decoration:underline; font-size:0.75rem; cursor:pointer;">ヒント（原形）</button>
+              </div>
+              <p id="quizTranslation" class="translation-box">---</p>
+              <p id="quizHintWord" class="hidden" style="font-size:0.8rem; color:var(--accent); font-weight:bold; margin-bottom:8px;">原形: <span id="quizHintWordText"></span></p>
+              <div id="quizSentence" style="font-size:1.1rem; font-weight:bold; line-height:1.5; margin:12px 0;">---</div>
+            </div>
+            <div>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="answerInput" placeholder="空欄に入る形を入力" onkeydown="if(event.key==='Enter') checkQuizAnswer()">
+                <button onclick="checkQuizAnswer()" class="btn">判定</button>
+              </div>
+              <div id="quizResult" style="margin-top:8px; font-size:0.8rem; font-weight:bold; min-height:18px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 例文全体入力 -->
+        <div id="fullMode" class="hidden">
+          <div class="quiz-card">
+            <div>
+              <div class="header">
+                <span id="fullHeaderLabel" class="badge">例文全文入力</span>
+                <button onclick="toggleFullHint()" style="background:none; border:none; color:var(--text-sub); text-decoration:underline; font-size:0.75rem; cursor:pointer;">対象単語を見る</button>
+              </div>
+              <p id="fullTranslation" class="translation-box">---</p>
+              <p id="fullHintWord" class="hidden" style="font-size:0.8rem; color:var(--accent); font-weight:bold; margin-bottom:8px;">対象単語: <span id="fullHintWordText"></span></p>
+            </div>
+            <div>
+              <textarea id="fullAnswerInput" rows="3" placeholder="英語の全文を入力してください" onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); checkFullAnswer(); }"></textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <button onclick="speakText(getCurrentList()[currentIndex]?.example)" class="btn btn-secondary" style="font-size:0.75rem;">🔊 模範音声</button>
+                <button onclick="checkFullAnswer()" class="btn" style="background:var(--success);">判定</button>
+              </div>
+              <div id="fullResult" style="margin-top:8px; font-size:0.8rem; font-weight:bold; min-height:18px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="emptyMode" class="panel hidden" style="text-align:center; padding:40px 16px;">
+          <h2 style="font-size:1.4rem; color:var(--success); margin-bottom:8px;">🎉 本日の復習完了！</h2>
+          <p style="font-size:0.85rem; color:var(--text-sub);">この教材で今日やるべき問題はすべてクリアしました。<br>また明日以降に自動で復習がセットされます！</p>
+        </div>
+
+        <div id="navArea" class="nav-buttons">
+          <button onclick="prevItem()" class="btn btn-secondary">← 前へ</button>
+          <button onclick="shuffleItems()" class="btn" style="background:#fef3c7; color:#b45309; width:50px; flex:none;" title="シャッフル">🔀</button>
+          <button onclick="nextItem()" class="btn">次へ →</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ★ パスワード設定（初期設定: "pass1234" の SHA-256 ハッシュ値）
+    const HASHED_PASSWORD = "6aa8ab6fabf54040b1df6f31889a0cdfd035d2df825b13d11ce3cd85ee738b34";
+
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function submitPassword() {
+      const input = document.getElementById('passInput').value;
+      const errEl = document.getElementById('authError');
+      
+      if (!input) return;
+
+      const hash = await sha256(input);
+      if (hash === HASHED_PASSWORD) {
+        sessionStorage.setItem('app_authenticated', 'true');
+        errEl.classList.add('hidden');
+        document.getElementById('authPanel').classList.add('hidden');
+        document.getElementById('mainContainer').classList.remove('hidden');
+        initAppContent();
+      } else {
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // ★★★ 教材リスト ★★★
+    const BOOKS = {
+      "book1": {
+        name: "教材1: 基本単語・例文帳",
+        url: "https://script.google.com/macros/s/AKfycby-Pr9I4XAzpu9fbNclaQ8TpL7rtKpBilXDG8fOKdSFfaW14Lv_N5sXooeuKqTM3_Phwg/exec"
+      },
+    };
+
+    let currentBookKey = "book1";
+    let allWords = [];
+    let activeWords = [];
+    let quizItems = [];
+    let srsDueItems = [];
+    let srsHistory = {};
+    let currentIndex = 0;
+    let cardStates = { card: false, exCard: false };
+    let currentActualWord = "";
+
+    function checkAuthOnStart() {
+      if (sessionStorage.getItem('app_authenticated') === 'true') {
+        document.getElementById('authPanel').classList.add('hidden');
+        document.getElementById('mainContainer').classList.remove('hidden');
+        initAppContent();
+      }
+    }
+
+    async function initAppContent() {
+      setupBookDropdown();
+      loadSRSHistory();
+      await loadCurrentBookData();
+    }
+
+    function setupBookDropdown() {
+      const select = document.getElementById('bookSelect');
+      select.innerHTML = '';
+      Object.keys(BOOKS).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = BOOKS[key].name;
+        select.appendChild(opt);
+      });
+      select.value = currentBookKey;
+    }
+
+    async function switchBook() {
+      currentBookKey = document.getElementById('bookSelect').value;
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      await loadCurrentBookData();
+    }
+
+    async function loadCurrentBookData() {
+      const cacheKey = `my_words_${currentBookKey}`;
+      const cachedData = localStorage.getItem(cacheKey);
+
+      if (cachedData) {
+        allWords = JSON.parse(cachedData);
+        setupApp();
+        if (navigator.onLine) fetchDataFromGAS(true);
+        else document.getElementById('offlineBadge').classList.remove('hidden');
+      } else {
+        if (navigator.onLine) await fetchDataFromGAS(false);
+        else {
+          alert('この教材のキャッシュがありません。オンラインで取得してください。');
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインのため読み込めません。</p>';
+        }
+      }
+    }
+
+    function loadSRSHistory() {
+      const data = localStorage.getItem('my_english_srs_history');
+      srsHistory = data ? JSON.parse(data) : {};
+    }
+
+    function saveSRSHistory() {
+      localStorage.setItem('my_english_srs_history', JSON.stringify(srsHistory));
+    }
+
+    async function fetchDataFromGAS(isBackground = false) {
+      const book = BOOKS[currentBookKey];
+      if (!book || !book.url) return;
+
+      try {
+        const res = await fetch(book.url);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          allWords = data;
+          localStorage.setItem(`my_words_${currentBookKey}`, JSON.stringify(data));
+          if (!isBackground) setupApp();
+        }
+      } catch (e) {
+        console.warn('GAS通信失敗:', e);
+        if (!isBackground) {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
+        }
+      }
+    }
+
+    function syncDataWithGAS() {
+      if (!navigator.onLine) return alert('オフラインのため再同期できません。');
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      fetchDataFromGAS(false);
+    }
+
+    function setupApp() {
+      document.getElementById('rangeFrom').value = 1;
+      document.getElementById('rangeTo').value = allWords.length;
+      document.getElementById('bookStatus').innerText = `データ件数: ${allWords.length} 件`;
+      applyRangeFilter();
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+    }
+
+    function applyRangeFilter() {
+      const from = parseInt(document.getElementById('rangeFrom').value) || 1;
+      const to = parseInt(document.getElementById('rangeTo').value) || allWords.length;
+
+      activeWords = allWords.filter((w, index) => {
+        const no = parseInt(w.group) || (index + 1);
+        return no >= from && no <= to;
+      });
+
+      buildQuizItems();
+      buildSRSDueList();
+      currentIndex = 0;
+      renderCurrentMode();
+    }
+
+    function buildQuizItems() {
+      quizItems = [];
+      activeWords.forEach((item) => {
+        const exLength = Math.max(item.examples.length, item.translations.length);
+        for (let i = 0; i < exLength; i++) {
+          if (item.examples[i]) {
+            const itemId = `${currentBookKey}_ex_${item.group}_${i}`;
+            quizItems.push({
+              id: itemId,
+              no: item.group,
+              word: item.word,
+              example: item.examples[i],
+              translation: item.translations[i] || '（和訳なし）',
+              exIndex: i + 1,
+              totalEx: exLength
+            });
+          }
+        }
+      });
+    }
+
+    function buildSRSDueList() {
+      const today = new Date().toISOString().split('T')[0];
+      srsDueItems = [];
+
+      quizItems.forEach(item => {
+        const history = srsHistory[item.id];
+        if (!history || !history.nextDate || history.nextDate <= today) {
+          srsDueItems.push(item);
+        }
+      });
+    }
+
+    function recordSRSResult(itemId, isCorrect) {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      let history = srsHistory[itemId] || { interval: 0, reps: 0 };
+
+      if (isCorrect) {
+        if (history.reps === 0) history.interval = 1;
+        else if (history.reps === 1) history.interval = 3;
+        else history.interval = Math.round(history.interval * 2.2);
+        history.reps += 1;
+      } else {
+        history.interval = 1;
+        history.reps = 0;
+      }
+
+      const nextDate = new Date(today);
+      nextDate.setDate(nextDate.getDate() + history.interval);
+      history.nextDate = nextDate.toISOString().split('T')[0];
+      history.lastDate = todayStr;
+
+      srsHistory[itemId] = history;
+      saveSRSHistory();
+    }
+
+    function getCurrentList() {
+      const mode = document.getElementById('modeSelect').value;
+      if (mode === 'srs') return srsDueItems;
+      if (mode === 'card') return activeWords;
+      return quizItems;
+    }
+
+    function switchMode() {
+      const mode = document.getElementById('modeSelect').value;
+      
+      if (mode === 'srs') document.getElementById('rangeContainer').classList.add('hidden');
+      else document.getElementById('rangeContainer').classList.remove('hidden');
+
+      ['cardMode', 'exCardMode', 'quizMode', 'fullMode', 'emptyMode'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+
+      if (mode === 'srs') buildSRSDueList();
+      currentIndex = 0;
+      renderCurrentMode();
+    }
+
+    function renderCurrentMode() {
+      const mode = document.getElementById('modeSelect').value;
+      const list = getCurrentList();
+      
+      document.getElementById('counter').innerText = `${list.length > 0 ? currentIndex + 1 : 0} / ${list.length}`;
+      document.getElementById('navArea').classList.toggle('hidden', list.length === 0);
+
+      if (list.length === 0 && mode === 'srs') {
+        document.getElementById('srsBox').classList.add('hidden');
+        document.getElementById('emptyMode').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('emptyMode').classList.add('hidden');
+
+      const activeMode = (mode === 'srs') ? 'quiz' : mode;
+      const currentItem = list[currentIndex];
+      
+      if (currentItem && currentItem.id && srsHistory[currentItem.id]) {
+        const h = srsHistory[currentItem.id];
+        document.getElementById('srsBox').classList.remove('hidden');
+        document.getElementById('srsInfo').innerText = `前回: ${h.lastDate || '未実施'}`;
+        document.getElementById('srsInterval').innerText = `記憶間隔: ${h.interval}日`;
+      } else {
+        document.getElementById('srsBox').classList.add('hidden');
+      }
+
+      ['cardMode', 'exCardMode', 'quizMode', 'fullMode'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+
+      if (activeMode === 'card') {
+        document.getElementById('cardMode').classList.remove('hidden');
+        renderCard();
+      } else if (activeMode === 'exCard') {
+        document.getElementById('exCardMode').classList.remove('hidden');
+        renderExCard();
+      } else if (activeMode === 'quiz' || mode === 'srs') {
+        document.getElementById('quizMode').classList.remove('hidden');
+        renderQuiz();
+      } else if (activeMode === 'full') {
+        document.getElementById('fullMode').classList.remove('hidden');
+        renderFull();
+      }
+    }
+
+    function renderCard() {
+      if (cardStates.card) flipCard('card');
+      const item = activeWords[currentIndex];
+      document.getElementById('cardNoLabel').innerText = `No. ${item.group || (currentIndex + 1)}`;
+      document.getElementById('cardWord').innerText = item.word || '';
+      document.getElementById('cardMeanings').innerHTML = item.meanings.map(m => `<div>・ ${m}</div>`).join('');
+
+      let examplesHtml = '';
+      const exLen = Math.max(item.examples.length, item.translations.length);
+      for (let i = 0; i < exLen; i++) {
+        examplesHtml += `<div style="margin-top:6px;"><strong>例文 ${i + 1}:</strong> ${item.examples[i] || ''}<br><span style="color:#94a3b8">${item.translations[i] || ''}</span></div>`;
+      }
+      document.getElementById('cardExamples').innerHTML = examplesHtml;
+    }
+
+    function renderExCard() {
+      const list = getCurrentList();
+      if (list.length === 0) return;
+      if (cardStates.exCard) flipCard('exCard');
+      const q = list[currentIndex];
+      document.getElementById('exCardHeader').innerText = `No. ${q.no} (${q.exIndex}/${q.totalEx})`;
+      document.getElementById('exCardHeaderBack').innerText = `Target: ${q.word}`;
+      document.getElementById('exCardTranslation').innerText = q.translation;
+
+      let highlighted = q.example;
+      if (q.word) {
+        const stem = q.word.substring(0, Math.max(3, Math.floor(q.word.length * 0.6)));
+        const reg = new RegExp(`\\b(${escapeRegExp(stem)}[a-z]*)\\b`, 'gi');
+        highlighted = q.example.replace(reg, '<span style="color:#fef08a; text-decoration:underline;">$1</span>');
+      }
+      document.getElementById('exCardSentence').innerHTML = highlighted;
+    }
+
+    function renderQuiz() {
+      const list = getCurrentList();
+      if (list.length === 0) return;
+      const q = list[currentIndex];
+      const baseWord = (q.word || "").trim();
+      currentActualWord = baseWord;
+      let maskedSentence = q.example;
+
+      if (baseWord) {
+        const stem = baseWord.substring(0, Math.max(3, Math.floor(baseWord.length * 0.6)));
+        const flexRegex = new RegExp(`\\b(${escapeRegExp(stem)}[a-z]*)\\b`, 'gi');
+        const match = flexRegex.exec(q.example);
+
+        if (match) {
+          currentActualWord = match[1];
+          maskedSentence = q.example.replace(flexRegex, '<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>');
+        }
+      }
+
+      document.getElementById('quizHeaderLabel').innerText = `No. ${q.no} (${q.exIndex}/${q.totalEx})`;
+      document.getElementById('quizTranslation').innerText = q.translation;
+      document.getElementById('quizSentence').innerHTML = maskedSentence;
+      document.getElementById('quizHintWordText').innerText = baseWord;
+      document.getElementById('answerInput').value = '';
+      document.getElementById('quizResult').innerText = '';
+      document.getElementById('quizHintWord').classList.add('hidden');
+    }
+
+    function checkQuizAnswer() {
+      const list = getCurrentList();
+      const q = list[currentIndex];
+      const userAns = document.getElementById('answerInput').value.trim().toLowerCase();
+      const targetAns = currentActualWord.toLowerCase();
+      const res = document.getElementById('quizResult');
+      const isCorrect = (userAns === targetAns);
+
+      if (q.id) recordSRSResult(q.id, isCorrect);
+
+      if (isCorrect) {
+        res.style.color = "var(--success)";
+        res.innerText = `⭕️ 正解！ (${currentActualWord})`;
+        speakText(q.example);
+      } else {
+        res.style.color = "var(--error)";
+        res.innerText = `❌ 残念！ 正解は 「${currentActualWord}」 です`;
+      }
+    }
+
+    function renderFull() {
+      const list = getCurrentList();
+      if (list.length === 0) return;
+      const q = list[currentIndex];
+      document.getElementById('fullHeaderLabel').innerText = `No. ${q.no} (${q.exIndex}/${q.totalEx})`;
+      document.getElementById('fullTranslation').innerText = q.translation;
+      document.getElementById('fullHintWordText').innerText = q.word;
+      document.getElementById('fullAnswerInput').value = '';
+      document.getElementById('fullResult').innerText = '';
+      document.getElementById('fullHintWord').classList.add('hidden');
+    }
+
+    function checkFullAnswer() {
+      const list = getCurrentList();
+      const q = list[currentIndex];
+      const userAns = cleanText(document.getElementById('fullAnswerInput').value);
+      const targetAns = cleanText(q.example);
+      const res = document.getElementById('fullResult');
+      const isCorrect = (userAns === targetAns);
+
+      if (q.id) recordSRSResult(q.id, isCorrect);
+
+      if (isCorrect) {
+        res.style.color = "var(--success)";
+        res.innerText = `⭕️ PERFECT! 全文正解です！`;
+        speakText(q.example);
+      } else {
+        res.style.color = "var(--error)";
+        res.innerHTML = `❌ 残念！<br>正解: ${q.example}`;
+      }
+    }
+
+    function cleanText(str) {
+      return str.trim().toLowerCase().replace(/[.,?!]$/, '').replace(/\s+/g, ' ');
+    }
+
+    function toggleQuizHint() { document.getElementById('quizHintWord').classList.toggle('hidden'); }
+    function toggleFullHint() { document.getElementById('fullHintWord').classList.toggle('hidden'); }
+    
+    function flipCard(cardId) {
+      const cardEl = document.getElementById(cardId);
+      cardStates[cardId] = !cardStates[cardId];
+      cardEl.classList.toggle('flipped', cardStates[cardId]);
+    }
+
+    function nextItem() {
+      const list = getCurrentList();
+      currentIndex = (currentIndex < list.length - 1) ? currentIndex + 1 : 0;
+      renderCurrentMode();
+    }
+
+    function prevItem() {
+      if (currentIndex > 0) { currentIndex--; renderCurrentMode(); }
+    }
+
+    function shuffleItems() {
+      const list = getCurrentList();
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+      currentIndex = 0;
+      renderCurrentMode();
+    }
+
+    function speakText(text) {
+      if (!text) return;
+      window.speechSynthesis.cancel();
+      const uttr = new SpeechSynthesisUtterance(text);
+      uttr.lang = 'en-US';
+      uttr.rate = 0.85;
+
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => 
+        v.lang.startsWith('en') && (
+          v.name.includes('Jamie') ||
+          v.name.includes('Ava') ||
+          v.name.includes('Samantha') || 
+          v.name.includes('Alex') || 
+          v.name.includes('Karen') ||
+          v.name.includes('Natural') || 
+          v.name.includes('Google US English')
+        )
+      );
+
+      if (preferredVoice) {
+        uttr.voice = preferredVoice;
+      }
+
+      window.speechSynthesis.speak(uttr);
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    window.addEventListener('offline', () => document.getElementById('offlineBadge').classList.remove('hidden'));
+    window.addEventListener('online', () => document.getElementById('offlineBadge').classList.add('hidden'));
+
+    // 起動時の初期化
+    checkAuthOnStart();
+  </script>
+</body>
+</html>
