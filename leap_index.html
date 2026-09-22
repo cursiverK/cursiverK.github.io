@@ -241,7 +241,7 @@
 
   <script>
     // ★ パスワード設定（初期設定: "pass1234" の SHA-256 ハッシュ値）
-    const HASHED_PASSWORD = "6aa8ab6fabf54040b1df6f31889a0cdfd035d2df825b13d11ce3cd85ee738b34";
+    const HASHED_PASSWORD = "67d0a9f620c806be74e82b93e91f32c0c553460cc279d0023c52110879d46492";
 
     async function sha256(str) {
       const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
