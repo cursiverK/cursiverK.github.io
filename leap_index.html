@@ -240,8 +240,8 @@
   </div>
 
   <script>
-    // ★ パスワード設定（初期設定: "pass1234" の SHA-256 ハッシュ値）
-    const HASHED_PASSWORD = "67d0a9f620c806be74e82b93e91f32c0c553460cc279d0023c52110879d46492";
+    // ★ パスワード設定（SHA-256 ハッシュ値）
+    const HASHED_PASSWORD = "fd03cc421401680442f3967168dad805dbdd1de1db0cd2678b84c14a12be2e64";
 
     async function sha256(str) {
       const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
