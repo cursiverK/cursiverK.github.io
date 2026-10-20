@@ -91,11 +91,9 @@
         <div class="form-group">
           <label>学習モード</label>
           <select id="modeSelect" onchange="switchMode()">
-            <option value="srs">🔥 本日の復習（忘却曲線おすすめ）</option>
             <option value="card">1. 単語カード（全例文・意味一覧）</option>
             <option value="exCard">2. 例文フラッシュカード（和訳 ⇄ 英文）</option>
-            <option value="quiz">3. 例文 穴埋めクイズ（変化形）</option>
-            <option value="full">4. 例文全体 タイピング・書き取り</option>
+            <option value="full">3. 例文全体 タイピング・書き取り</option>
           </select>
         </div>
 
@@ -383,28 +381,25 @@
     function applyRangeFilter() {
       const from = parseInt(document.getElementById('rangeFrom').value) || 1;
       const to = parseInt(document.getElementById('rangeTo').value) || allWords.length;
-
+    
       activeWords = allWords.filter((w, index) => {
         const no = parseInt(w.group) || (index + 1);
         return no >= from && no <= to;
       });
-
+    
       buildQuizItems();
-      buildSRSDueList();
       currentIndex = 0;
       renderCurrentMode();
     }
-
+    
     function buildQuizItems() {
       quizItems = [];
       activeWords.forEach((item) => {
         const exLength = Math.max(item.examples.length, item.translations.length);
         for (let i = 0; i < exLength; i++) {
           if (item.examples[i]) {
-            const itemId = `${currentBookKey}_ex_${item.group}_${i}`;
             quizItems.push({
-              id: itemId,
-              no: item.group,
+              no: item.group || '1',
               word: item.word,
               example: item.examples[i],
               translation: item.translations[i] || '（和訳なし）',
@@ -454,67 +449,42 @@
 
     function getCurrentList() {
       const mode = document.getElementById('modeSelect').value;
-      if (mode === 'srs') return srsDueItems;
       if (mode === 'card') return activeWords;
-      return quizItems;
+      return quizItems; // exCard と full で共通利用
     }
-
+    
     function switchMode() {
       const mode = document.getElementById('modeSelect').value;
       
-      if (mode === 'srs') document.getElementById('rangeContainer').classList.add('hidden');
-      else document.getElementById('rangeContainer').classList.remove('hidden');
-
-      ['cardMode', 'exCardMode', 'quizMode', 'fullMode', 'emptyMode'].forEach(id => {
+      // どのモードでも範囲指定は有効にする
+      document.getElementById('rangeContainer').classList.remove('hidden');
+    
+      ['cardMode', 'exCardMode', 'fullMode'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
-
-      if (mode === 'srs') buildSRSDueList();
+    
       currentIndex = 0;
       renderCurrentMode();
     }
-
+    
     function renderCurrentMode() {
       const mode = document.getElementById('modeSelect').value;
       const list = getCurrentList();
       
       document.getElementById('counter').innerText = `${list.length > 0 ? currentIndex + 1 : 0} / ${list.length}`;
       document.getElementById('navArea').classList.toggle('hidden', list.length === 0);
-
-      if (list.length === 0 && mode === 'srs') {
-        document.getElementById('srsBox').classList.add('hidden');
-        document.getElementById('emptyMode').classList.remove('hidden');
-        return;
-      }
-
-      document.getElementById('emptyMode').classList.add('hidden');
-
-      const activeMode = (mode === 'srs') ? 'quiz' : mode;
-      const currentItem = list[currentIndex];
-      
-      if (currentItem && currentItem.id && srsHistory[currentItem.id]) {
-        const h = srsHistory[currentItem.id];
-        document.getElementById('srsBox').classList.remove('hidden');
-        document.getElementById('srsInfo').innerText = `前回: ${h.lastDate || '未実施'}`;
-        document.getElementById('srsInterval').innerText = `記憶間隔: ${h.interval}日`;
-      } else {
-        document.getElementById('srsBox').classList.add('hidden');
-      }
-
-      ['cardMode', 'exCardMode', 'quizMode', 'fullMode'].forEach(id => {
+    
+      ['cardMode', 'exCardMode', 'fullMode'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
-
-      if (activeMode === 'card') {
+    
+      if (mode === 'card') {
         document.getElementById('cardMode').classList.remove('hidden');
         renderCard();
-      } else if (activeMode === 'exCard') {
+      } else if (mode === 'exCard') {
         document.getElementById('exCardMode').classList.remove('hidden');
         renderExCard();
-      } else if (activeMode === 'quiz' || mode === 'srs') {
-        document.getElementById('quizMode').classList.remove('hidden');
-        renderQuiz();
-      } else if (activeMode === 'full') {
+      } else if (mode === 'full') {
         document.getElementById('fullMode').classList.remove('hidden');
         renderFull();
       }
