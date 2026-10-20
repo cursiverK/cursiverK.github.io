@@ -51,8 +51,6 @@
     .hidden { display: none !important; }
     .nav-buttons { display: flex; gap: 8px; margin-top: 16px; }
     .nav-buttons .btn { flex: 1; }
-
-    .SRS-box { background: #e0e7ff; color: #3730a3; padding: 8px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -70,7 +68,7 @@
       <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden">❌ パスワードが違います</div>
     </div>
 
-    <!-- 📚 メインアプリ画面（ログイン後に表示） -->
+    <!-- 📚 メインアプリ画面 -->
     <div id="mainContainer" class="hidden">
       <div class="panel">
         <div class="header">
@@ -97,6 +95,7 @@
           </select>
         </div>
 
+        <!-- 範囲指定（最初から表示） -->
         <div id="rangeContainer" class="form-group">
           <div class="range-box">
             <span style="color:var(--text-sub)">範囲:</span>
@@ -120,11 +119,6 @@
 
       <!-- メインコンテンツ -->
       <div id="app" class="hidden">
-
-        <div id="srsBox" class="SRS-box hidden">
-          <span id="srsInfo">次回復習: 今日</span>
-          <span id="srsInterval">間隔: 1日</span>
-        </div>
 
         <!-- 1. 単語カード -->
         <div id="cardMode" class="hidden">
@@ -177,29 +171,7 @@
           </div>
         </div>
 
-        <!-- 3. 穴埋めクイズ -->
-        <div id="quizMode" class="hidden">
-          <div class="quiz-card">
-            <div>
-              <div class="header">
-                <span id="quizHeaderLabel" class="badge">穴埋めクイズ</span>
-                <button onclick="toggleQuizHint()" style="background:none; border:none; color:var(--text-sub); text-decoration:underline; font-size:0.75rem; cursor:pointer;">ヒント（原形）</button>
-              </div>
-              <p id="quizTranslation" class="translation-box">---</p>
-              <p id="quizHintWord" class="hidden" style="font-size:0.8rem; color:var(--accent); font-weight:bold; margin-bottom:8px;">原形: <span id="quizHintWordText"></span></p>
-              <div id="quizSentence" style="font-size:1.1rem; font-weight:bold; line-height:1.5; margin:12px 0;">---</div>
-            </div>
-            <div>
-              <div style="display:flex; gap:8px;">
-                <input type="text" id="answerInput" placeholder="空欄に入る形を入力" onkeydown="if(event.key==='Enter') checkQuizAnswer()">
-                <button onclick="checkQuizAnswer()" class="btn">判定</button>
-              </div>
-              <div id="quizResult" style="margin-top:8px; font-size:0.8rem; font-weight:bold; min-height:18px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. 例文全体入力 -->
+        <!-- 3. 例文全体入力 -->
         <div id="fullMode" class="hidden">
           <div class="quiz-card">
             <div>
@@ -219,11 +191,6 @@
               <div id="fullResult" style="margin-top:8px; font-size:0.8rem; font-weight:bold; min-height:18px;"></div>
             </div>
           </div>
-        </div>
-
-        <div id="emptyMode" class="panel hidden" style="text-align:center; padding:40px 16px;">
-          <h2 style="font-size:1.4rem; color:var(--success); margin-bottom:8px;">🎉 本日の復習完了！</h2>
-          <p style="font-size:0.85rem; color:var(--text-sub);">この教材で今日やるべき問題はすべてクリアしました。<br>また明日以降に自動で復習がセットされます！</p>
         </div>
 
         <div id="navArea" class="nav-buttons">
@@ -263,7 +230,7 @@
         errEl.classList.remove('hidden');
       }
     }
-
+    
     // ★★★ 教材リスト ★★★
     const BOOKS = {
       "book1": {
@@ -276,12 +243,10 @@
     let allWords = [];
     let activeWords = [];
     let quizItems = [];
-    let srsDueItems = [];
-    let srsHistory = {};
     let currentIndex = 0;
     let cardStates = { card: false, exCard: false };
-    let currentActualWord = "";
 
+    // 起動時にすでに認証済みかチェック
     function checkAuthOnStart() {
       if (sessionStorage.getItem('app_authenticated') === 'true') {
         document.getElementById('authPanel').classList.add('hidden');
@@ -292,7 +257,6 @@
 
     async function initAppContent() {
       setupBookDropdown();
-      loadSRSHistory();
       await loadCurrentBookData();
     }
 
@@ -333,15 +297,6 @@
       }
     }
 
-    function loadSRSHistory() {
-      const data = localStorage.getItem('my_english_srs_history');
-      srsHistory = data ? JSON.parse(data) : {};
-    }
-
-    function saveSRSHistory() {
-      localStorage.setItem('my_english_srs_history', JSON.stringify(srsHistory));
-    }
-
     async function fetchDataFromGAS(isBackground = false) {
       const book = BOOKS[currentBookKey];
       if (!book || !book.url) return;
@@ -373,9 +328,6 @@
       document.getElementById('rangeFrom').value = 1;
       document.getElementById('rangeTo').value = allWords.length;
       document.getElementById('bookStatus').innerText = `データ件数: ${allWords.length} 件`;
-
-      switchMode();
-      
       applyRangeFilter();
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
@@ -384,17 +336,17 @@
     function applyRangeFilter() {
       const from = parseInt(document.getElementById('rangeFrom').value) || 1;
       const to = parseInt(document.getElementById('rangeTo').value) || allWords.length;
-    
+
       activeWords = allWords.filter((w, index) => {
         const no = parseInt(w.group) || (index + 1);
         return no >= from && no <= to;
       });
-    
+
       buildQuizItems();
       currentIndex = 0;
       renderCurrentMode();
     }
-    
+
     function buildQuizItems() {
       quizItems = [];
       activeWords.forEach((item) => {
@@ -414,73 +366,28 @@
       });
     }
 
-    function buildSRSDueList() {
-      const today = new Date().toISOString().split('T')[0];
-      srsDueItems = [];
-
-      quizItems.forEach(item => {
-        const history = srsHistory[item.id];
-        if (!history || !history.nextDate || history.nextDate <= today) {
-          srsDueItems.push(item);
-        }
-      });
-    }
-
-    function recordSRSResult(itemId, isCorrect) {
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      let history = srsHistory[itemId] || { interval: 0, reps: 0 };
-
-      if (isCorrect) {
-        if (history.reps === 0) history.interval = 1;
-        else if (history.reps === 1) history.interval = 3;
-        else history.interval = Math.round(history.interval * 2.2);
-        history.reps += 1;
-      } else {
-        history.interval = 1;
-        history.reps = 0;
-      }
-
-      const nextDate = new Date(today);
-      nextDate.setDate(nextDate.getDate() + history.interval);
-      history.nextDate = nextDate.toISOString().split('T')[0];
-      history.lastDate = todayStr;
-
-      srsHistory[itemId] = history;
-      saveSRSHistory();
-    }
-
     function getCurrentList() {
       const mode = document.getElementById('modeSelect').value;
       if (mode === 'card') return activeWords;
-      return quizItems; // exCard と full で共通利用
+      return quizItems;
     }
-    
+
     function switchMode() {
-      const mode = document.getElementById('modeSelect').value;
-      
-      // どのモードでも範囲指定は有効にする
-      document.getElementById('rangeContainer').classList.remove('hidden');
-    
-      ['cardMode', 'exCardMode', 'fullMode'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-    
       currentIndex = 0;
       renderCurrentMode();
     }
-    
+
     function renderCurrentMode() {
       const mode = document.getElementById('modeSelect').value;
       const list = getCurrentList();
       
       document.getElementById('counter').innerText = `${list.length > 0 ? currentIndex + 1 : 0} / ${list.length}`;
       document.getElementById('navArea').classList.toggle('hidden', list.length === 0);
-    
+
       ['cardMode', 'exCardMode', 'fullMode'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
-    
+
       if (mode === 'card') {
         document.getElementById('cardMode').classList.remove('hidden');
         renderCard();
@@ -496,12 +403,13 @@
     function renderCard() {
       if (cardStates.card) flipCard('card');
       const item = activeWords[currentIndex];
+      if (!item) return;
       document.getElementById('cardNoLabel').innerText = `No. ${item.group || (currentIndex + 1)}`;
       document.getElementById('cardWord').innerText = item.word || '';
-      document.getElementById('cardMeanings').innerHTML = item.meanings.map(m => `<div>・ ${m}</div>`).join('');
+      document.getElementById('cardMeanings').innerHTML = (item.meanings || []).map(m => `<div>・ ${m}</div>`).join('');
 
       let examplesHtml = '';
-      const exLen = Math.max(item.examples.length, item.translations.length);
+      const exLen = Math.max((item.examples || []).length, (item.translations || []).length);
       for (let i = 0; i < exLen; i++) {
         examplesHtml += `<div style="margin-top:6px;"><strong>例文 ${i + 1}:</strong> ${item.examples[i] || ''}<br><span style="color:#94a3b8">${item.translations[i] || ''}</span></div>`;
       }
@@ -526,54 +434,6 @@
       document.getElementById('exCardSentence').innerHTML = highlighted;
     }
 
-    function renderQuiz() {
-      const list = getCurrentList();
-      if (list.length === 0) return;
-      const q = list[currentIndex];
-      const baseWord = (q.word || "").trim();
-      currentActualWord = baseWord;
-      let maskedSentence = q.example;
-
-      if (baseWord) {
-        const stem = baseWord.substring(0, Math.max(3, Math.floor(baseWord.length * 0.6)));
-        const flexRegex = new RegExp(`\\b(${escapeRegExp(stem)}[a-z]*)\\b`, 'gi');
-        const match = flexRegex.exec(q.example);
-
-        if (match) {
-          currentActualWord = match[1];
-          maskedSentence = q.example.replace(flexRegex, '<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>');
-        }
-      }
-
-      document.getElementById('quizHeaderLabel').innerText = `No. ${q.no} (${q.exIndex}/${q.totalEx})`;
-      document.getElementById('quizTranslation').innerText = q.translation;
-      document.getElementById('quizSentence').innerHTML = maskedSentence;
-      document.getElementById('quizHintWordText').innerText = baseWord;
-      document.getElementById('answerInput').value = '';
-      document.getElementById('quizResult').innerText = '';
-      document.getElementById('quizHintWord').classList.add('hidden');
-    }
-
-    function checkQuizAnswer() {
-      const list = getCurrentList();
-      const q = list[currentIndex];
-      const userAns = document.getElementById('answerInput').value.trim().toLowerCase();
-      const targetAns = currentActualWord.toLowerCase();
-      const res = document.getElementById('quizResult');
-      const isCorrect = (userAns === targetAns);
-
-      if (q.id) recordSRSResult(q.id, isCorrect);
-
-      if (isCorrect) {
-        res.style.color = "var(--success)";
-        res.innerText = `⭕️ 正解！ (${currentActualWord})`;
-        speakText(q.example);
-      } else {
-        res.style.color = "var(--error)";
-        res.innerText = `❌ 残念！ 正解は 「${currentActualWord}」 です`;
-      }
-    }
-
     function renderFull() {
       const list = getCurrentList();
       if (list.length === 0) return;
@@ -594,8 +454,6 @@
       const res = document.getElementById('fullResult');
       const isCorrect = (userAns === targetAns);
 
-      if (q.id) recordSRSResult(q.id, isCorrect);
-
       if (isCorrect) {
         res.style.color = "var(--success)";
         res.innerText = `⭕️ PERFECT! 全文正解です！`;
@@ -610,7 +468,6 @@
       return str.trim().toLowerCase().replace(/[.,?!]$/, '').replace(/\s+/g, ' ');
     }
 
-    function toggleQuizHint() { document.getElementById('quizHintWord').classList.toggle('hidden'); }
     function toggleFullHint() { document.getElementById('fullHintWord').classList.toggle('hidden'); }
     
     function flipCard(cardId) {
@@ -649,8 +506,6 @@
       const voices = window.speechSynthesis.getVoices();
       const preferredVoice = voices.find(v => 
         v.lang.startsWith('en') && (
-          v.name.includes('Jamie') ||
-          v.name.includes('Ava') ||
           v.name.includes('Samantha') || 
           v.name.includes('Alex') || 
           v.name.includes('Karen') ||
@@ -679,7 +534,7 @@
     window.addEventListener('offline', () => document.getElementById('offlineBadge').classList.remove('hidden'));
     window.addEventListener('online', () => document.getElementById('offlineBadge').classList.add('hidden'));
 
-    // 起動時の初期化
+    // 起動時の初期化チェック
     checkAuthOnStart();
   </script>
 </body>
