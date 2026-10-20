@@ -267,7 +267,7 @@
     // ★★★ 教材リスト ★★★
     const BOOKS = {
       "book1": {
-        name: "教材1: 基本単語・例文帳",
+        name: "教材1: LEAP",
         url: "https://script.google.com/macros/s/AKfycby-Pr9I4XAzpu9fbNclaQ8TpL7rtKpBilXDG8fOKdSFfaW14Lv_N5sXooeuKqTM3_Phwg/exec"
       },
     };
@@ -373,6 +373,9 @@
       document.getElementById('rangeFrom').value = 1;
       document.getElementById('rangeTo').value = allWords.length;
       document.getElementById('bookStatus').innerText = `データ件数: ${allWords.length} 件`;
+
+      switchMode();
+      
       applyRangeFilter();
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
