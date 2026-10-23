@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4f46e5">
+  <title>単語・例文総合学習アプリ</title>
+  
+  <style>
+    :root {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --text-main: #1e293b;
+      --text-sub: #64748b;
+      --accent: #d97706;
+      --success: #059669;
+      --error: #e11d48;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+    .container { width: 100%; max-width: 420px; }
+    .panel { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .header h1 { font-size: 1.1rem; font-weight: bold; }
+    .badge { font-size: 0.75rem; background: #f1f5f9; padding: 4px 10px; border-radius: 20px; font-weight: 600; color: var(--text-sub); }
+    .status-offline { background: #fef3c7; color: #b45309; }
+    
+    .form-group { margin-bottom: 10px; font-size: 0.8rem; }
+    .form-group label { display: block; color: var(--text-sub); margin-bottom: 4px; font-weight: 600; }
+    .range-box { display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    input[type="number"], select, input[type="password"], input[type="text"], textarea {
+      width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none;
+    }
+    input[type="number"] { width: 60px; text-align: center; font-weight: bold; }
+    
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-secondary { background: #e2e8f0; color: var(--text-main); }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-sync { background: #0f172a; color: white; padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; }
+
+    /* フラッシュカード要素 */
+    .perspective { perspective: 1000px; height: 320px; width: 100%; cursor: pointer; }
+    .card-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.5s; }
+    .card-inner.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .card-front { background: #fff; text-align: center; }
+    .card-back { background: #0f172a; color: #fff; transform: rotateY(180deg); text-align: left; overflow-y: auto; }
+
+    /* クイズカード要素 */
+    .quiz-card { background: #fff; border-radius: 16px; padding: 24px; min-height: 320px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .question-box { background: #f8fafc; padding: 16px; border-radius: 12px; font-size: 1.1rem; font-weight: bold; text-align: center; margin-bottom: 16px; line-height: 1.4; color: var(--text-main); }
+
+    .hidden { display: none !important; }
+    .judge-buttons { display: flex; gap: 12px; margin-top: 16px; }
+    .btn-correct { background: var(--success); color: white; flex: 1; padding: 14px; font-size: 1rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+    .btn-incorrect { background: var(--error); color: white; flex: 1; padding: 14px; font-size: 1rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+
+    .action-list { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- 🔒 ログイン画面 -->
+    <div id="authPanel" class="panel" style="text-align:center; padding: 32px 20px;">
+      <h2 style="font-size:1.2rem; margin-bottom:12px;">🔒 パスワード保護</h2>
+      <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:20px;">アプリを利用するにはパスワードを入力してください。</p>
+      <div style="margin-bottom:16px;">
+        <input type="password" id="passInput" placeholder="パスワードを入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') submitPassword()">
+      </div>
+      <button onclick="submitPassword()" class="btn" style="width:100%;">ログイン</button>
+      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden"></div>
+    </div>
+
+    <!-- 📚 メインアプリ画面 -->
+    <div id="mainContainer" class="hidden">
+      <div class="panel">
+        <div class="header">
+          <h1>My 例文＆単語学習</h1>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="offlineBadge" class="badge hidden status-offline">オフライン</span>
+            <span id="counter" class="badge">0 / 0</span>
+          </div>
+        </div>
+
+        <!-- 教材切替ドロップダウン -->
+        <div class="form-group">
+          <label>📚 教材（スプレッドシート）</label>
+          <select id="bookSelect" onchange="switchBook()"></select>
+        </div>
+
+        <!-- 学習モード切替 -->
+        <div class="form-group">
+          <label>🔄 学習モード</label>
+          <select id="modeSelect" onchange="restartSession()">
+            <option value="exCard">1. 例文フラッシュカード (表:和訳 ➔ 裏:英文/自己判定)</option>
+            <option value="wordCard">2. 単語フラッシュカード (表:単語 ➔ 裏:意味・例文/自己判定)</option>
+            <option value="wordTyping">3. 単語タイピング (和訳 ➔ 英単語入力)</option>
+            <option value="fullTyping">4. 例文全文タイピング (和訳 ➔ 英文全文入力)</option>
+          </select>
+        </div>
+
+        <!-- 範囲指定 -->
+        <div id="rangeContainer" class="form-group">
+          <div class="range-box">
+            <span style="color:var(--text-sub)">範囲:</span>
+            <input type="number" id="rangeFrom" min="1" placeholder="1">
+            <span>〜</span>
+            <input type="number" id="rangeTo" min="1" placeholder="Max">
+            <button onclick="applyRangeFilter()" class="btn btn-secondary" style="margin-left:auto;">指定実行</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <span id="bookStatus" style="font-size: 0.7rem; color: var(--text-sub);"></span>
+          <button onclick="syncDataWithGAS()" class="btn btn-sync">🔄 データ再同期</button>
+        </div>
+      </div>
+
+      <!-- 読込中 -->
+      <div id="loading" class="panel" style="text-align:center; padding:32px;">
+        <p style="color:var(--text-sub)">データを取得中...</p>
+      </div>
+
+      <!-- メインコンテンツ -->
+      <div id="app" class="hidden">
+        
+        <!-- モード1 & 2: フラッシュカード表示エリア -->
+        <div id="flashcardArea" class="hidden">
+          <div class="perspective" onclick="flipCard()">
+            <div id="flashcard" class="card-inner">
+              <!-- 表面 -->
+              <div class="card-face card-front">
+                <div class="header">
+                  <span id="cardNoLabel" class="badge">No.---</span>
+                  <span id="cardFrontSub" style="font-size:0.75rem; color:var(--text-sub);">表面</span>
+                </div>
+                <div style="margin:auto 0; text-align:center;">
+                  <div id="cardFrontText" style="font-size: 1.5rem; font-weight:bold; line-height:1.4;">---</div>
+                  <button id="speakBtnFront" onclick="event.stopPropagation(); speakCurrentTarget('front')" class="btn btn-secondary hidden" style="font-size:0.75rem; margin-top:12px;">🔊 発音を聞く</button>
+                </div>
+                <span style="font-size:0.75rem; color:var(--text-sub); text-align:center;">タップで裏返し</span>
+              </div>
+              <!-- 裏面 -->
+              <div class="card-face card-back">
+                <div class="header">
+                  <span id="cardNoLabelBack" class="badge" style="background:#334155; color:#cbd5e1;">Answer</span>
+                  <span id="cardBackSub" style="font-size:0.75rem; color:#94a3b8;">裏面</span>
+                </div>
+                <div style="margin:auto 0;">
+                  <div id="cardBackText" style="font-size: 1.2rem; font-weight: bold; color:#fef08a; line-height: 1.4;">---</div>
+                  <div id="cardBackExtra" style="margin-top:10px; font-size:0.85rem; color:#cbd5e1; line-height:1.4;"></div>
+                  <button id="speakBtnBack" onclick="event.stopPropagation(); speakCurrentTarget('back')" class="btn btn-secondary hidden" style="font-size:0.75rem; margin-top:12px; background:#1e293b; color:#fef08a; border:1px solid #334155;">🔊 英文を聞く</button>
+                </div>
+                <span style="font-size:0.75rem; color:#64748b; text-align:center;">タップで表に戻る</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 正誤判定ボタン -->
+          <div class="judge-buttons">
+            <button onclick="handleCardAnswer(false)" class="btn-incorrect">❌ 不正解</button>
+            <button onclick="handleCardAnswer(true)" class="btn-correct">⭕️ 正解</button>
+          </div>
+        </div>
+
+        <!-- モード3 & 4: タイピング入力エリア -->
+        <div id="typingArea" class="hidden">
+          <div class="quiz-card">
+            <div>
+              <div class="header">
+                <span id="typingNoLabel" class="badge">No.---</span>
+                <button onclick="toggleHint()" style="background:none; border:none; color:var(--text-sub); text-decoration:underline; font-size:0.75rem; cursor:pointer;">ヒント</button>
+              </div>
+              <div id="typingQuestionText" class="question-box">---</div>
+              <div id="hintWordBox" class="hidden" style="font-size:0.8rem; color:var(--accent); font-weight:bold; margin-bottom:8px;">ヒント: <span id="hintWordText"></span></div>
+            </div>
+            <div>
+              <div id="singleInputBox" style="display:flex; gap:8px; margin-bottom:8px;">
+                <input type="text" id="userInput" placeholder="英単語を入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') checkTypingAnswer()">
+                <button onclick="checkTypingAnswer()" class="btn">判定</button>
+              </div>
+              <div id="fullInputBox" class="hidden">
+                <textarea id="fullInput" rows="3" placeholder="英語の全文を入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); checkTypingAnswer(); }"></textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                  <button onclick="speakCurrentTarget('back')" class="btn btn-secondary" style="font-size:0.75rem;">🔊 模範音声</button>
+                  <button onclick="checkTypingAnswer()" class="btn" style="background:var(--success);">判定</button>
+                </div>
+              </div>
+              <div id="resultMessage" style="font-size: 0.85rem; font-weight: bold; min-height: 24px; text-align: center; margin-top:8px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🎉 1周完了画面 -->
+        <div id="completePanel" class="panel hidden" style="text-align:center; padding:36px 16px;">
+          <h2 style="font-size:1.4rem; color:var(--success); margin-bottom:12px;">🎉 1周完了！お疲れ様でした！</h2>
+          <div id="scoreSummary" style="font-size:1rem; font-weight:bold; margin-bottom:12px; color:var(--text-main);"></div>
+
+          <div class="action-list">
+            <button id="retryIncorrectBtn" onclick="startIncorrectOnly()" class="btn" style="background:var(--error); color:white;">❌ 不正解だった問題だけやり直す</button>
+            <button onclick="shuffleAndRestart()" class="btn" style="background:#fef3c7; color:#b45309;">🔀 範囲内をシャッフルしてやり直す</button>
+            <button onclick="restartSession()" class="btn btn-secondary">▶️ 最初から順番にやり直す</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- 1. Service Worker & PWA Manifest 内蔵化（1ファイルで完全オフライン機能を実現） ---
+    (function registerEmbeddedPWA() {
+      if ('serviceWorker' in navigator) {
+        const swCode = `
+          const CACHE_NAME = 'vocab-pwa-v1';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            // キャッシュファースト戦略
+            e.respondWith(
+              caches.match(e.request).then((cachedResponse) => {
+                if (cachedResponse) return cachedResponse;
+                return fetch(e.request).then((networkResponse) => {
+                  if (e.request.method === 'GET' && networkResponse.status === 200) {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
+                  }
+                  return networkResponse;
+                }).catch(() => {
+                  return cachedResponse;
+                });
+              })
+            );
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'text/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(err => console.error("SW Reg failed:", err));
+      }
+
+      // Inline Manifest 生成
+      const manifestObj = {
+        name: "単語・例文総合学習アプリ",
+        short_name: "単語学習",
+        start_url: ".",
+        display: "standalone",
+        background_color: "#f1f5f9",
+        theme_color: "#4f46e5"
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = URL.createObjectURL(manifestBlob);
+      document.head.appendChild(manifestLink);
+    })();
+
+    // --- 2. アプリのメインロジック ---
+    const HASHED_PASSWORD = "fd03cc421401680442f3967168dad805dbdd1de1db0cd2678b84c14a12be2e64";
+
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function submitPassword() {
+      const input = document.getElementById('passInput').value;
+      const errEl = document.getElementById('authError');
+      
+      // ① 未入力のチェック
+      if (!input) {
+        errEl.innerText = "❌ パスワードが未入力です";
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const hash = await sha256(input);
+      if (hash === HASHED_PASSWORD) {
+        sessionStorage.setItem('app_authenticated', 'true');
+        errEl.classList.add('hidden');
+        document.getElementById('authPanel').classList.add('hidden');
+        document.getElementById('mainContainer').classList.remove('hidden');
+        initAppContent();
+      } else {
+        // ② 間違っているときのチェック
+        errEl.innerText = "❌ パスワードが違います";
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    const BOOKS = {
+      "book1": {
+        name: "クラウン4級･5級",
+        url: "https://script.google.com/macros/s/AKfycbwcXOq43AkRgl9VptTst_W2PWElhnvMRQvI5YZyOswAeBj9lIyQgwsjK2ldOw3FE_Uy/exec",
+        storagekey: "my_crown45"
+      },
+    };
+
+    let currentBookKey = "book1";
+    let allWords = [];
+    let activeItems = [];
+    let filteredRangeItems = [];
+    let incorrectItems = [];
+    let currentIndex = 0;
+    let isFlipped = false;
+    let correctCount = 0;
+
+    function checkAuthOnStart() {
+      if (sessionStorage.getItem('app_authenticated') === 'true') {
+        document.getElementById('authPanel').classList.add('hidden');
+        document.getElementById('mainContainer').classList.remove('hidden');
+        initAppContent();
+      }
+    }
+
+    async function initAppContent() {
+      setupBookDropdown();
+      await loadCurrentBookData();
+    }
+
+    function setupBookDropdown() {
+      const select = document.getElementById('bookSelect');
+      select.innerHTML = '';
+      Object.keys(BOOKS).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = BOOKS[key].name;
+        select.appendChild(opt);
+      });
+      select.value = currentBookKey;
+    }
+
+    async function switchBook() {
+      currentBookKey = document.getElementById('bookSelect').value;
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      await loadCurrentBookData();
+    }
+
+    async function loadCurrentBookData() {
+      // 選択された教材の storageKey を取得する
+      const book = BOOKS[currentBookKey];
+      const cacheKey = book.storageKey; 
+
+      const cachedData = localStorage.getItem(cacheKey);
+
+      if (cachedData) {
+        allWords = JSON.parse(cachedData);
+        setupApp();
+        if (navigator.onLine) fetchDataFromGAS(true);
+        else document.getElementById('offlineBadge').classList.remove('hidden');
+      } else {
+        if (navigator.onLine) await fetchDataFromGAS(false);
+        else {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。データがありません。</p>';
+        }
+      }
+    }
+
+    async function fetchDataFromGAS(isBackground = false) {
+      const book = BOOKS[currentBookKey];
+      if (!book || !book.url) return;
+
+      try {
+        const res = await fetch(book.url);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          allWords = data;
+          // 保存時もそれぞれの storageKey を使う
+          localStorage.setItem(book.storageKey, JSON.stringify(data));
+          if (!isBackground) setupApp();
+        }
+      } catch (e) {
+        console.warn('GAS通信失敗:', e);
+        if (!isBackground) {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
+        }
+      }
+    }
+
+    function syncDataWithGAS() {
+      if (!navigator.onLine) return alert('オフラインのため再同期できません。');
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      fetchDataFromGAS(false);
+    }
+
+    function setupApp() {
+      document.getElementById('rangeFrom').value = 1;
+      document.getElementById('rangeTo').value = allWords.length;
+      document.getElementById('bookStatus').innerText = `データ件数: ${allWords.length} 件`;
+      applyRangeFilter();
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      updateOfflineStatus(!navigator.onLine);
+    }
+
+    function applyRangeFilter() {
+      applyRangeFilterInternal();
+      restartSession();
+    }
+
+    function applyRangeFilterInternal() {
+      const from = parseInt(document.getElementById('rangeFrom').value) || 1;
+      const to = parseInt(document.getElementById('rangeTo').value) || allWords.length;
+
+      const filteredRaw = allWords.filter((w, index) => {
+        const no = parseInt(w.group) || (index + 1);
+        return no >= from && no <= to;
+      });
+
+      const mode = document.getElementById('modeSelect').value;
+      filteredRangeItems = [];
+
+      if (mode === 'wordCard' || mode === 'wordTyping') {
+        filteredRaw.forEach((item, index) => {
+          filteredRangeItems.push({
+            no: item.group || (index + 1),
+            word: item.word || '',
+            meanings: item.meanings || [],
+            examples: item.examples || [],
+            translations: item.translations || []
+          });
+        });
+      } else {
+        filteredRaw.forEach((item, index) => {
+          const examples = (item.examples && item.examples.length > 0) ? item.examples : [item.word || ''];
+          const translations = (item.translations && item.translations.length > 0) ? item.translations : (item.meanings || ['（意味なし）']);
+          const exLength = Math.max(examples.length, translations.length);
+          for (let i = 0; i < exLength; i++) {
+            if (examples[i]) {
+              filteredRangeItems.push({
+                no: item.group || (index + 1),
+                word: item.word || '',
+                example: examples[i],
+                translation: translations[i] || item.word || '（和訳なし）',
+                exIndex: i + 1,
+                totalEx: exLength
+              });
+            }
+          }
+        });
+      }
+    }
+
+    function restartSession() {
+      applyRangeFilterInternal();
+      activeItems = [...filteredRangeItems];
+      currentIndex = 0;
+      correctCount = 0;
+      incorrectItems = [];
+      document.getElementById('completePanel').classList.add('hidden');
+      renderItem();
+    }
+
+    function shuffleAndRestart() {
+      applyRangeFilterInternal();
+      activeItems = [...filteredRangeItems];
+      for (let i = activeItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [activeItems[i], activeItems[j]] = [activeItems[j], activeItems[i]];
+      }
+      currentIndex = 0;
+      correctCount = 0;
+      incorrectItems = [];
+      document.getElementById('completePanel').classList.add('hidden');
+      renderItem();
+    }
+
+    function startIncorrectOnly() {
+      if (incorrectItems.length === 0) return;
+      activeItems = [...incorrectItems];
+      currentIndex = 0;
+      correctCount = 0;
+      incorrectItems = [];
+      document.getElementById('completePanel').classList.add('hidden');
+      renderItem();
+    }
+
+    function renderItem() {
+      if (activeItems.length === 0) return;
+
+      if (currentIndex >= activeItems.length) {
+        document.getElementById('flashcardArea').classList.add('hidden');
+        document.getElementById('typingArea').classList.add('hidden');
+        document.getElementById('completePanel').classList.remove('hidden');
+        
+        document.getElementById('scoreSummary').innerText = `結果: ${correctCount} / ${activeItems.length} 問正解 (不正解: ${incorrectItems.length} 問)`;
+        document.getElementById('counter').innerText = `${activeItems.length} / ${activeItems.length} (完了)`;
+
+        const retryBtn = document.getElementById('retryIncorrectBtn');
+        if (incorrectItems.length === 0) {
+          retryBtn.classList.add('hidden');
+        } else {
+          retryBtn.classList.remove('hidden');
+          retryBtn.innerText = `❌ 不正解だった ${incorrectItems.length} 問だけやり直す`;
+        }
+        return;
+      }
+
+      const item = activeItems[currentIndex];
+      const mode = document.getElementById('modeSelect').value;
+
+      document.getElementById('counter').innerText = `${currentIndex + 1} / ${activeItems.length}`;
+
+      if (mode === 'exCard' || mode === 'wordCard') {
+        document.getElementById('typingArea').classList.add('hidden');
+        document.getElementById('flashcardArea').classList.remove('hidden');
+
+        if (isFlipped) {
+          isFlipped = false;
+          document.getElementById('flashcard').classList.remove('flipped');
+        }
+
+        if (mode === 'exCard') {
+          document.getElementById('cardNoLabel').innerText = `No. ${item.no} (${item.exIndex}/${item.totalEx})`;
+          document.getElementById('cardFrontText').innerText = item.translation || '';
+          document.getElementById('cardBackText').innerText = item.example || '';
+          document.getElementById('cardBackExtra').innerText = item.word ? `Target: ${item.word}` : '';
+          document.getElementById('speakBtnFront').classList.add('hidden');
+          document.getElementById('speakBtnBack').classList.remove('hidden');
+        } else {
+          document.getElementById('cardNoLabel').innerText = `No. ${item.no}`;
+          document.getElementById('cardFrontText').innerText = item.word || '';
+          document.getElementById('cardBackText').innerText = (item.meanings || []).join(', ');
+          
+          let exText = '';
+          if (item.examples && item.examples.length > 0) {
+            exText = item.examples.map((ex, idx) => `<div>・ ${ex}<br><span style="color:#94a3b8; font-size:0.75rem;">${item.translations[idx] || ''}</span></div>`).join('');
+          }
+          document.getElementById('cardBackExtra').innerHTML = exText;
+          document.getElementById('speakBtnFront').classList.remove('hidden');
+          document.getElementById('speakBtnBack').classList.add('hidden');
+        }
+
+      } else {
+        document.getElementById('flashcardArea').classList.add('hidden');
+        document.getElementById('typingArea').classList.remove('hidden');
+
+        document.getElementById('resultMessage').innerText = '';
+        document.getElementById('resultMessage').style.backgroundColor = 'transparent';
+        document.getElementById('hintWordBox').classList.add('hidden');
+
+        if (mode === 'wordTyping') {
+          document.getElementById('typingNoLabel').innerText = `No. ${item.no}`;
+          document.getElementById('typingQuestionText').innerText = (item.meanings || []).join(', ');
+          document.getElementById('singleInputBox').classList.remove('hidden');
+          document.getElementById('fullInputBox').classList.add('hidden');
+          document.getElementById('userInput').value = '';
+          document.getElementById('hintWordText').innerText = item.word || '';
+        } else {
+          document.getElementById('typingNoLabel').innerText = `No. ${item.no} (${item.exIndex}/${item.totalEx})`;
+          document.getElementById('typingQuestionText').innerText = item.translation || '';
+          document.getElementById('singleInputBox').classList.add('hidden');
+          document.getElementById('fullInputBox').classList.remove('hidden');
+          document.getElementById('fullInput').value = '';
+          document.getElementById('hintWordText').innerText = item.word || '';
+        }
+      }
+    }
+
+    function flipCard() {
+      const cardEl = document.getElementById('flashcard');
+      isFlipped = !isFlipped;
+      cardEl.classList.toggle('flipped', isFlipped);
+    }
+
+    function handleCardAnswer(isCorrect) {
+      if (activeItems.length === 0 || currentIndex >= activeItems.length) return;
+      const item = activeItems[currentIndex];
+
+      if (isCorrect) correctCount++;
+      else incorrectItems.push(item);
+
+      currentIndex++;
+      renderItem();
+    }
+
+    function checkTypingAnswer() {
+      if (activeItems.length === 0 || currentIndex >= activeItems.length) return;
+
+      const item = activeItems[currentIndex];
+      const mode = document.getElementById('modeSelect').value;
+      const resEl = document.getElementById('resultMessage');
+
+      let userVal = '';
+      let targetVal = '';
+
+      if (mode === 'wordTyping') {
+        userVal = document.getElementById('userInput').value.trim().toLowerCase();
+        targetVal = (item.word || '').trim().toLowerCase();
+      } else {
+        userVal = cleanText(document.getElementById('fullInput').value);
+        targetVal = cleanText(item.example || '');
+      }
+
+      const isCorrect = (userVal === targetVal);
+
+      if (isCorrect) {
+        correctCount++;
+        resEl.style.color = "var(--success)";
+        resEl.style.backgroundColor = "#d1fae5";
+        resEl.style.padding = "6px";
+        resEl.style.borderRadius = "6px";
+        resEl.innerText = "⭕️ PERFECT! 正解です！";
+        speakText(mode === 'wordTyping' ? item.word : item.example);
+
+        setTimeout(() => {
+          currentIndex++;
+          renderItem();
+        }, 800);
+      } else {
+        incorrectItems.push(item);
+        resEl.style.color = "var(--error)";
+        resEl.style.backgroundColor = "#fee2e2";
+        resEl.style.padding = "6px";
+        resEl.style.borderRadius = "6px";
+        const correctShow = mode === 'wordTyping' ? item.word : item.example;
+        resEl.innerText = `❌ 残念！ (正解: ${correctShow})`;
+
+        setTimeout(() => {
+          currentIndex++;
+          renderItem();
+        }, 1800);
+      }
+    }
+
+    function cleanText(str) {
+      return str.trim().toLowerCase().replace(/[.,?!]$/, '').replace(/\s+/g, ' ');
+    }
+
+    function toggleHint() {
+      document.getElementById('hintWordBox').classList.toggle('hidden');
+    }
+
+    function speakCurrentTarget(targetFace) {
+      if (activeItems.length === 0 || currentIndex >= activeItems.length) return;
+      const item = activeItems[currentIndex];
+      const mode = document.getElementById('modeSelect').value;
+
+      if (mode === 'exCard') {
+        speakText(item.example);
+      } else if (mode === 'wordCard') {
+        speakText(item.word);
+      } else if (mode === 'fullTyping') {
+        speakText(item.example);
+      } else {
+        speakText(item.word);
+      }
+    }
+
+    function speakText(text) {
+      if (!text || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const uttr = new SpeechSynthesisUtterance(text);
+      uttr.lang = 'fr-FR';
+      uttr.rate = 0.85;
+
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => 
+        v.lang.startsWith('fr') && (
+          v.name.includes('Audrey') || 
+          v.name.includes('Amélie') || 
+          v.name.includes('Thomas') || 
+          v.name.includes('Aude') || 
+          v.name.includes('Google français')
+        )
+      );
+
+      if (preferredVoice) uttr.voice = preferredVoice;
+      window.speechSynthesis.speak(uttr);
+    }
+
+    // テキスト比較用（アポストロフィや特殊記号をきれいに処理する関数）
+    function cleanText(str) {
+      return str.trim().toLowerCase()
+        .replace(/[.,?!]$/, '')
+        .replace(/[’']/g, "'") // 波アポストロフィ等を半角アポストロフィに統一
+        .replace(/\s+/g, ' ');
+    }
+
+    function updateOfflineStatus(isOffline) {
+      const badge = document.getElementById('offlineBadge');
+      if (isOffline) badge.classList.remove('hidden');
+      else badge.classList.add('hidden');
+    }
+
+    window.addEventListener('offline', () => updateOfflineStatus(true));
+    window.addEventListener('online', () => updateOfflineStatus(false));
+
+    checkAuthOnStart();
+  </script>
+</body>
+</html>
