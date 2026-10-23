@@ -73,7 +73,7 @@
         <input type="password" id="passInput" placeholder="パスワードを入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') submitPassword()">
       </div>
       <button onclick="submitPassword()" class="btn" style="width:100%;">ログイン</button>
-      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden">❌ パスワードが違います</div>
+      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden"></div>
     </div>
 
     <!-- 📚 メインアプリ画面 -->
@@ -275,8 +275,14 @@
     async function submitPassword() {
       const input = document.getElementById('passInput').value;
       const errEl = document.getElementById('authError');
-      if (!input) return;
-
+      
+      // ① 未入力のチェック
+      if (!input) {
+        errEl.innerText = "❌ パスワードが未入力です";
+        errEl.classList.remove('hidden');
+        return;
+      }
+    
       const hash = await sha256(input);
       if (hash === HASHED_PASSWORD) {
         sessionStorage.setItem('app_authenticated', 'true');
@@ -285,6 +291,8 @@
         document.getElementById('mainContainer').classList.remove('hidden');
         initAppContent();
       } else {
+        // ② 間違っているときのチェック
+        errEl.innerText = "❌ パスワードが違います";
         errEl.classList.remove('hidden');
       }
     }
@@ -354,6 +362,27 @@
         if (navigator.onLine) await fetchDataFromGAS(false);
         else {
           document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。データがありません。</p>';
+        }
+      }
+    }
+
+    async function fetchDataFromGAS(isBackground = false) {
+      const book = BOOKS[currentBookKey];
+      if (!book || !book.url) return;
+
+      try {
+        const res = await fetch(book.url);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          allWords = data;
+          // 保存時もそれぞれの storageKey を使う
+          localStorage.setItem(book.storageKey, JSON.stringify(data));
+          if (!isBackground) setupApp();
+        }
+      } catch (e) {
+        console.warn('GAS通信失敗:', e);
+        if (!isBackground) {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
         }
       }
     }
