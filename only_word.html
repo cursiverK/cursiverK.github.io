@@ -1,571 +1,859 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#4f46e5">
-  <title>英単語学習アプリ (PWA)</title>
-  
-  <style>
-    :root {
-      --bg-color: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #4f46e5;
-      --primary-hover: #4338ca;
-      --text-main: #0f172a;
-      --text-sub: #64748b;
-      --accent: #d97706;
-      --success: #059669;
-      --error: #e11d48;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
-    .container { width: 100%; max-width: 420px; }
-    
-    .panel { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .header h1 { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
-    .badge { font-size: 0.75rem; background: #f1f5f9; padding: 4px 10px; border-radius: 20px; font-weight: 600; color: var(--text-sub); }
-    .status-offline { background: #fef3c7; color: #b45309; }
-    
-    .form-group { margin-bottom: 12px; font-size: 0.8rem; }
-    .form-group label { display: block; color: var(--text-sub); margin-bottom: 4px; font-weight: 600; }
-    .range-box { display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    
-    input[type="number"], select, input[type="password"], input[type="text"] {
-      width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; transition: border-color 0.2s;
-    }
-    input[type="number"] { width: 65px; text-align: center; font-weight: bold; }
-    input:focus, select:focus { border-color: var(--primary); }
-    
-    .btn { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-    .btn:hover { background: var(--primary-hover); }
-    .btn-secondary { background: #e2e8f0; color: var(--text-main); }
-    .btn-secondary:hover { background: #cbd5e1; }
-    .btn-sync { background: #0f172a; color: white; padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>マイ単語帳</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: one narrow column; home (deck, range, two modes, loader) -> session (index card) -> result.
+   Look: a 単語カード, with a red header rule and pale blue ruling on the card faces. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --ink:#1b2735; --muted:#5d6b7b; --line:#d3dae3; --soft:#e3e8ee; --rule:#dde8f3;
+  --accent:#c8372d; --on-accent:#ffffff;
+  --good:#1f7a4d; --bad:#b3261e; --good-bg:#e1f2e8; --bad-bg:#fae5e3;
+  --f-en:"Instrument Serif","Times New Roman",serif;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a22; --surface:#1d2530; --ink:#e8edf3; --muted:#9aa8b8; --line:#2f3a48; --soft:#252f3c; --rule:#27323f;
+    --accent:#ef6a5e; --on-accent:#1a0c0a;
+    --good:#5fcf94; --bad:#ff8a80; --good-bg:#1d3a2c; --bad-bg:#432322;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a22; --surface:#1d2530; --ink:#e8edf3; --muted:#9aa8b8; --line:#2f3a48; --soft:#252f3c; --rule:#27323f;
+  --accent:#ef6a5e; --on-accent:#1a0c0a;
+  --good:#5fcf94; --bad:#ff8a80; --good-bg:#1d3a2c; --bad-bg:#432322;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--f-ui); font-size:16px; line-height:1.65;
+  padding-block:24px 56px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap{max-width:720px; margin:0 auto; display:grid; gap:28px}
+section{display:grid; gap:24px; min-width:0}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+.muted{color:var(--muted)}
+.eyebrow{margin:0; font-family:var(--f-mono); font-size:.75rem; letter-spacing:.08em; color:var(--muted)}
 
-    /* モードA: フラッシュカード */
-    .perspective { perspective: 1000px; height: 260px; width: 100%; cursor: pointer; }
-    .card-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.4s ease-out; }
-    .card-inner.flipped { transform: rotateY(180deg); }
-    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .card-front { background: #ffffff; text-align: center; }
-    .card-back { background: #0f172a; color: #ffffff; transform: rotateY(180deg); text-align: center; }
+.brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.06em}
+.brand i{display:block; width:10px; height:22px; background:var(--accent); border-radius:1px}
 
-    /* モードB: クイズ・タイピング */
-    .quiz-card { background: #fff; border-radius: 16px; padding: 20px; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .question-box { background: #f8fafc; padding: 20px; border-radius: 12px; font-size: 1.2rem; font-weight: bold; text-align: center; margin-bottom: 12px; line-height: 1.4; color: var(--text-main); border: 1px dashed #cbd5e1; }
+/* buttons */
+.btn{
+  min-height:48px; padding:0 20px; border:1px solid var(--line); background:var(--surface);
+  border-radius:6px; cursor:pointer; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:10px;
+}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
+.btn:disabled{opacity:.45; cursor:default}
+.btn kbd{font-family:var(--f-mono); font-size:.75rem; opacity:.75}
+.link{background:none; border:0; padding:4px 0; color:var(--muted); text-decoration:underline; text-underline-offset:3px; cursor:pointer}
+.link:hover{color:var(--ink)}
 
-    .hidden { display: none !important; }
-    .judge-buttons { display: flex; gap: 12px; margin-top: 16px; }
-    .btn-correct { background: var(--success); color: white; flex: 1; padding: 14px; font-size: 1rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
-    .btn-incorrect { background: var(--error); color: white; flex: 1; padding: 14px; font-size: 1rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+/* home */
+.deck{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; padding-bottom:20px; border-bottom:1px solid var(--line)}
+.deck .num{font-family:var(--f-mono); font-size:3.25rem; line-height:1; font-weight:500; font-variant-numeric:tabular-nums}
+.deck .unit{font-weight:700; font-size:1.1rem}
+.deck .src{flex-basis:100%; margin:0; color:var(--muted); font-size:.9rem; overflow-wrap:anywhere}
 
-    .action-list { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-  </style>
-</head>
-<body>
+.range{display:grid; gap:12px}
+.range-row{display:flex; gap:12px; flex-wrap:wrap; align-items:end}
+.field{display:grid; gap:4px; min-width:0}
+.field span{font-size:.8rem; color:var(--muted)}
+.field input[type=number]{
+  width:120px; min-height:44px; padding:0 12px; background:var(--surface); border:1px solid var(--line); border-radius:6px;
+  font-family:var(--f-mono); font-variant-numeric:tabular-nums;
+}
+.check{display:flex; align-items:center; gap:10px; min-height:44px; cursor:pointer}
+.check input{width:20px; height:20px; accent-color:var(--accent)}
+.range-count{margin:0; font-size:.9rem; color:var(--muted)}
 
-  <div class="container">
+.modes{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px}
+.mode{
+  text-align:left; padding:20px; border:1px solid var(--line); background:var(--surface); border-radius:6px; cursor:pointer;
+  display:grid; gap:6px;
+}
+.mode:hover{border-color:var(--accent)}
+.mode b{font-size:1.15rem}
+.mode span{color:var(--muted); font-size:.9rem}
+.mode .dir{font-family:var(--f-mono); font-size:.8rem; color:var(--accent); letter-spacing:.04em}
+.start-msg{margin:0; color:var(--bad); min-height:1.4em; font-size:.9rem}
 
-    <!-- 🔒 1. ログイン画面 -->
-    <div id="authPanel" class="panel" style="text-align:center; padding: 32px 20px;">
-      <h2 style="font-size:1.2rem; margin-bottom:12px;">🔒 英単語学習ログイン</h2>
-      <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:20px;">アクセスパスワードを入力してください。</p>
-      <div style="margin-bottom:16px;">
-        <input type="password" id="passInput" placeholder="パスワードを入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') submitPassword()">
-      </div>
-      <button onclick="submitPassword()" class="btn" style="width:100%;">ログイン</button>
-      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden"></div>
+details.loader{border:1px solid var(--line); border-radius:6px; background:var(--surface)}
+details.loader summary{padding:16px 20px; cursor:pointer; font-weight:700; list-style:none; display:flex; justify-content:space-between; align-items:center}
+details.loader summary::-webkit-details-marker{display:none}
+details.loader summary::after{content:"+"; font-family:var(--f-mono); color:var(--muted)}
+details.loader[open] summary::after{content:"−"}
+.loader-body{padding:0 20px 20px; display:grid; gap:14px}
+.loader-body p{margin:0}
+.cols{display:flex; gap:8px; flex-wrap:wrap; font-family:var(--f-mono); font-size:.8rem}
+.cols span{padding:2px 8px; border:1px solid var(--line); border-radius:3px}
+.cols span.use{border-color:var(--accent); color:var(--accent)}
+.cols span.skip{color:var(--muted); text-decoration:line-through}
+.tabs{display:flex; gap:4px; border-bottom:1px solid var(--line)}
+.tab{background:none; border:0; border-bottom:2px solid transparent; padding:8px 14px; cursor:pointer; color:var(--muted); font-weight:500; margin-bottom:-1px}
+.tab[aria-selected=true]{color:var(--ink); border-bottom-color:var(--accent)}
+textarea{
+  width:100%; min-height:132px; padding:12px; resize:vertical; background:var(--bg); border:1px solid var(--line); border-radius:6px;
+  font-family:var(--f-mono); font-size:.85rem; line-height:1.5;
+}
+input[type=file]{max-width:100%; font-size:.9rem}
+select{min-height:44px; padding:0 10px; background:var(--surface); border:1px solid var(--line); border-radius:6px; max-width:100%}
+.status{min-height:1.5em; color:var(--muted); font-size:.9rem}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--good)}
+.foot{margin:0; font-size:.8rem; color:var(--muted)}
+
+/* session */
+.s-bar{display:flex; justify-content:space-between; align-items:center; gap:12px}
+.s-bar .prog{font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:.9rem}
+.meter{height:4px; background:var(--soft); border-radius:2px; overflow:hidden}
+.meter i{display:block; height:100%; width:0; background:var(--accent); transition:width .25s}
+
+.flip{perspective:1400px; cursor:pointer; outline-offset:4px}
+.flip .inner{display:grid; transform-style:preserve-3d; transition:transform .45s cubic-bezier(.3,.7,.2,1)}
+.flip.flipped .inner{transform:rotateY(180deg)}
+.face, .card{
+  background-color:var(--surface);
+  background-image:linear-gradient(var(--accent),var(--accent)), repeating-linear-gradient(to bottom, transparent 0, transparent 35px, var(--rule) 35px, var(--rule) 36px);
+  background-size:100% 2px, 100% 100%;
+  background-position:0 52px, 0 0;
+  background-repeat:no-repeat, repeat;
+  border:1px solid var(--line); border-radius:6px;
+  min-height:300px; padding:22px 26px;
+  display:flex; flex-direction:column; justify-content:space-between; gap:16px;
+}
+.face{grid-area:1/1; backface-visibility:hidden; -webkit-backface-visibility:hidden; min-width:0}
+.face.back{transform:rotateY(180deg)}
+.tag{font-family:var(--f-mono); font-size:.75rem; letter-spacing:.06em; color:var(--muted)}
+.word{font-family:var(--f-en); font-size:clamp(2.8rem,10vw,4.5rem); line-height:1.05; overflow-wrap:anywhere}
+.ja{font-weight:700; font-size:clamp(1.6rem,6vw,2.3rem); line-height:1.5; overflow-wrap:anywhere}
+.ja.big{font-size:clamp(1.7rem,6.5vw,2.6rem)}
+.word-small{font-family:var(--f-en); font-size:1.4rem; color:var(--muted); overflow-wrap:anywhere}
+.cue{font-size:.8rem; color:var(--muted)}
+.actions{display:flex; gap:12px; flex-wrap:wrap}
+.actions .btn{flex:1 1 140px}
+.pair{display:flex; gap:12px; width:100%; flex-wrap:wrap}
+.pair .btn{flex:1 1 140px}
+
+#quiz{display:grid; gap:16px}
+#ans{
+  width:100%; min-height:56px; padding:0 16px; background:var(--surface); border:1px solid var(--line); border-radius:6px;
+  font-family:var(--f-en); font-size:1.8rem;
+}
+#ans:focus{outline:2px solid var(--accent); outline-offset:1px}
+#ans[readonly]{background:var(--soft)}
+.hintline{min-height:1.6em; font-family:var(--f-mono); letter-spacing:.2em; color:var(--muted)}
+.fb{padding:14px 16px; border-radius:6px; display:grid; gap:4px}
+.fb.ok{background:var(--good-bg)}
+.fb.ng{background:var(--bad-bg)}
+.fb strong.ok{color:var(--good)}
+.fb strong.ng{color:var(--bad)}
+.fb .ans-word{font-family:var(--f-en); font-size:1.7rem; line-height:1.2; overflow-wrap:anywhere}
+.fb .yours{font-size:.9rem; color:var(--muted); overflow-wrap:anywhere}
+.fb .link{justify-self:start}
+
+/* result */
+.score{margin:0; font-family:var(--f-mono); font-size:4rem; line-height:1; font-variant-numeric:tabular-nums}
+.score small{font-size:1.5rem; color:var(--muted)}
+.missed{display:grid; gap:0; border-top:1px solid var(--line)}
+.missed div{display:grid; grid-template-columns:3.2rem minmax(0,1fr) minmax(0,1.2fr); gap:12px; padding:10px 0; border-bottom:1px solid var(--line); align-items:baseline}
+.missed .n{font-family:var(--f-mono); font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums}
+.missed .e{font-family:var(--f-en); font-size:1.4rem; overflow-wrap:anywhere}
+.missed .j{overflow-wrap:anywhere}
+@media (max-width:480px){ .missed div{grid-template-columns:2.6rem minmax(0,1fr)} .missed .j{grid-column:2} }
+
+.btn svg{width:18px; height:18px; flex:none}
+.speakrow{display:flex}
+.field select{min-width:0}
+ol.steps{margin:0; padding-left:1.3em; display:grid; gap:6px; font-size:.9rem}
+pre.code{margin:0; max-height:300px; overflow:auto; padding:12px; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:var(--f-mono); font-size:.78rem; line-height:1.5; white-space:pre}
+@media (prefers-reduced-motion: reduce){
+  .flip .inner, .meter i{transition:none}
+}
+</style>
+
+<div class="wrap">
+  <div class="brand"><i></i><span>マイ単語帳</span></div>
+
+  <!-- HOME -->
+  <section id="home">
+    <div class="deck">
+      <span class="num" id="count">0</span><span class="unit">語</span>
+      <p class="src" id="deckSrc"></p>
     </div>
 
-    <!-- 📚 2. メインアプリ画面 -->
-    <div id="mainContainer" class="hidden">
-      <div class="panel">
-        <div class="header">
-          <h1>英単語マスター (PWA)</h1>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span id="offlineBadge" class="badge hidden status-offline">オフライン</span>
-            <span id="counter" class="badge">0 / 0</span>
-          </div>
-        </div>
-
-        <!-- 教材選択 -->
-        <div class="form-group">
-          <label>📚 教材単語帳（スプレッドシート）</label>
-          <select id="bookSelect" onchange="switchBook()"></select>
-        </div>
-
-        <!-- 学習モード切替 -->
-        <div class="form-group">
-          <label>🔄 学習モード</label>
-          <select id="modeSelect" onchange="restartSession()">
-            <option value="flashcard">モードA: 英 ➔ 日 (フラッシュカード)</option>
-            <option value="typing">モードB: 日 ➔ 英 (英単語タイピング)</option>
-          </select>
-        </div>
-
-        <!-- 範囲指定 -->
-        <div id="rangeContainer" class="form-group">
-          <div class="range-box">
-            <span style="color:var(--text-sub)">範囲:</span>
-            <input type="number" id="rangeFrom" min="1" placeholder="1">
-            <span>〜</span>
-            <input type="number" id="rangeTo" min="1" placeholder="Max">
-            <button onclick="applyRangeFilter()" class="btn btn-secondary" style="margin-left:auto;">設定</button>
-          </div>
-        </div>
-
-        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
-          <span id="bookStatus" style="font-size: 0.75rem; color: var(--text-sub);"></span>
-          <button onclick="reloadBookData()" class="btn btn-sync">🔄 再同期</button>
-        </div>
+    <div class="range" id="gasBox" hidden>
+      <p class="eyebrow">スプレッドシート</p>
+      <div class="range-row">
+        <label class="field" id="gBookRow"><span>ファイル</span><select id="gBook"></select></label>
+        <label class="field"><span>シート</span><select id="gSheet"></select></label>
+        <button class="btn" id="gReload" type="button">更新</button>
       </div>
+      <p class="status" id="gStatus" role="status"></p>
+    </div>
 
-      <!-- 読込中インジケータ -->
-      <div id="loading" class="panel" style="text-align:center; padding:32px;">
-        <p style="color:var(--text-sub)">単語データを読み込み中...</p>
+    <div class="range">
+      <p class="eyebrow">出題範囲（A列の番号）</p>
+      <div class="range-row">
+        <label class="field"><span>開始</span><input id="from" type="number" inputmode="numeric" placeholder="1"></label>
+        <label class="field"><span>終了</span><input id="to" type="number" inputmode="numeric" placeholder="100"></label>
+        <label class="check"><input id="shuffle" type="checkbox" checked><span>ランダムな順番で出す</span></label>
       </div>
+      <p class="range-count" id="rangeCount"></p>
+    </div>
 
-      <!-- メインコンテンツ -->
-      <div id="app" class="hidden">
-        
-        <!-- モードA: 英 ➔ 日 (フラッシュカード) -->
-        <div id="flashcardArea" class="hidden">
-          <div class="perspective" onclick="flipCard()">
-            <div id="flashcard" class="card-inner">
-              <!-- 表面: 英単語 -->
-              <div class="card-face card-front">
-                <div class="header">
-                  <span id="cardNoLabel" class="badge">No.---</span>
-                  <span style="font-size:0.75rem; color:var(--text-sub);">表面 (English)</span>
-                </div>
-                <div style="margin:auto 0; text-align:center;">
-                  <div id="cardWordText" style="font-size: 1.8rem; font-weight:bold; color:var(--primary);">---</div>
-                  <button onclick="event.stopPropagation(); speakWord()" class="btn btn-secondary" style="font-size:0.75rem; margin-top:16px;">🔊 発音を聞く</button>
-                </div>
-                <span style="font-size:0.75rem; color:var(--text-sub); text-align:center;">タップで裏返し</span>
-              </div>
-              <!-- 裏面: 日本語訳 -->
-              <div class="card-face card-back">
-                <div class="header">
-                  <span id="cardNoLabelBack" class="badge" style="background:#334155; color:#cbd5e1;">Answer</span>
-                  <span style="font-size:0.75rem; color:#94a3b8;">裏面 (意味)</span>
-                </div>
-                <div style="margin:auto 0;">
-                  <div id="cardMeaningText" style="font-size: 1.4rem; font-weight: bold; color:#fef08a; line-height: 1.4;">---</div>
-                </div>
-                <span style="font-size:0.75rem; color:#64748b; text-align:center;">タップで表に戻る</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 正誤判定ボタン -->
-          <div class="judge-buttons">
-            <button onclick="handleCardAnswer(false)" class="btn-incorrect">❌ 不正解</button>
-            <button onclick="handleCardAnswer(true)" class="btn-correct">⭕️ 正解</button>
-          </div>
-        </div>
-
-        <!-- モードB: 日 ➔ 英 (英単語タイピング) -->
-        <div id="typingArea" class="hidden">
-          <div class="quiz-card">
-            <div>
-              <div class="header">
-                <span id="typingNoLabel" class="badge">No.---</span>
-                <button onclick="speakWord()" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 8px;">🔊 発音を聞く</button>
-              </div>
-              <div id="typingQuestionText" class="question-box">---</div>
-            </div>
-            <div>
-              <div style="display:flex; gap:8px; margin-bottom:8px;">
-                <input type="text" id="userInput" placeholder="英単語を入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') checkTypingAnswer()">
-                <button onclick="checkTypingAnswer()" class="btn">判定</button>
-              </div>
-              <div id="resultMessage" style="font-size: 0.85rem; font-weight: bold; min-height: 28px; text-align: center; margin-top:8px; display:flex; align-items:center; justify-content:center;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 🎉 1周完了パネル -->
-        <div id="completePanel" class="panel hidden" style="text-align:center; padding:36px 16px;">
-          <h2 style="font-size:1.3rem; color:var(--success); margin-bottom:12px;">🎉 1周完了！お疲れ様でした！</h2>
-          <div id="scoreSummary" style="font-size:0.95rem; font-weight:bold; margin-bottom:16px; color:var(--text-main);"></div>
-
-          <div class="action-list">
-            <button id="retryIncorrectBtn" onclick="startIncorrectOnly()" class="btn" style="background:var(--error); color:white;">❌ 不正解だった単語だけやり直す</button>
-            <button onclick="shuffleAndRestart()" class="btn" style="background:#fef3c7; color:#b45309;">🔀 範囲内をシャッフルしてやり直す</button>
-            <button onclick="restartSession()" class="btn btn-secondary">▶️ 最初から順番にやり直す</button>
-          </div>
-        </div>
-
+    <div class="range" id="ttsBox">
+      <p class="eyebrow">音声（このデバイスの読み上げ機能）</p>
+      <div class="range-row">
+        <label class="check"><input id="tts" type="checkbox" checked><span>英単語を読み上げる</span></label>
+        <label class="field"><span>速さ</span>
+          <select id="rate"><option value="0.7">ゆっくり</option><option value="0.9" selected>ふつう</option><option value="1.1">はやめ</option></select>
+        </label>
+        <label class="field" id="voiceRow" hidden><span>声</span><select id="voice"></select></label>
       </div>
     </div>
 
-  </div>
+    <div>
+      <div class="modes">
+        <button class="mode" id="startFlash" type="button">
+          <span class="dir">EN → JA</span>
+          <b>フラッシュカード</b>
+          <span>英単語を見て、和訳を思い出す</span>
+        </button>
+        <button class="mode" id="startQuiz" type="button">
+          <span class="dir">JA → EN</span>
+          <b>入力テスト</b>
+          <span>和訳を見て、英単語を打ち込む</span>
+        </button>
+      </div>
+      <p class="start-msg" id="startMsg" role="alert"></p>
+    </div>
 
-  <script>
-    // --- 1. PWA & Service Worker 内蔵定義 (オフラインキャッシュ用) ---
-    (function registerEmbeddedPWA() {
-      if ('serviceWorker' in navigator) {
-        const swCode = `
-          const CACHE_NAME = 'vocab-simple-v1';
-          self.addEventListener('install', (e) => self.skipWaiting());
-          self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-          self.addEventListener('fetch', (e) => {
-            e.respondWith(
-              caches.match(e.request).then((cached) => {
-                if (cached) return cached;
-                return fetch(e.request).then((res) => {
-                  if (e.request.method === 'GET' && res.status === 200) {
-                    const clone = res.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-                  }
-                  return res;
-                }).catch(() => cached);
-              })
-            );
-          });
-        `;
-        const blob = new Blob([swCode], { type: 'text/javascript' });
-        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.error("SW fail:", err));
-      }
+    <details class="loader" id="loader">
+      <summary>スプレッドシートを読み込む</summary>
+      <div class="loader-body">
+        <p class="cols" aria-label="使う列">
+          <span class="use">A 番号</span><span class="use">B 英単語</span><span class="use">C 和訳</span><span class="skip">D</span><span class="skip">E</span>
+        </p>
+        <p class="muted" style="font-size:.9rem">D列以降にデータがあっても使いません。1行目が見出しでも自動で飛ばします。</p>
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" id="tabPaste" aria-selected="true" type="button">貼り付け</button>
+          <button class="tab" role="tab" id="tabFile" aria-selected="false" type="button">ファイル</button>
+        </div>
+        <div id="panePaste" style="display:grid; gap:12px">
+          <label class="sr" for="paste">スプレッドシートの内容</label>
+          <textarea id="paste" placeholder="スプレッドシートでA〜C列を選んでコピーし、ここに貼り付けます" spellcheck="false"></textarea>
+          <div><button class="btn primary" id="loadPaste" type="button">読み込む</button></div>
+        </div>
+        <div id="paneFile" style="display:grid; gap:12px" hidden>
+          <label class="sr" for="file">ファイル</label>
+          <input id="file" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt">
+          <label class="field" id="sheetRow" hidden><span>シート</span><select id="sheet"></select></label>
+          <p class="muted" style="font-size:.85rem">.xlsx / .xls / .csv / .tsv に対応しています。</p>
+        </div>
+        <p class="status" id="status" role="status"></p>
+      </div>
+    </details>
 
-      const manifestObj = {
-        name: "英単語学習 (PWA)",
-        short_name: "単語学習",
-        start_url: ".",
-        display: "standalone",
-        background_color: "#f8fafc",
-        theme_color: "#4f46e5"
-      };
-      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
-      const link = document.createElement('link');
-      link.rel = 'manifest';
-      link.href = URL.createObjectURL(manifestBlob);
-      document.head.appendChild(link);
-    })();
+    <details class="loader" id="setup">
+      <summary>Googleスプレッドシートと自動でつなぐ設定</summary>
+      <div class="loader-body">
+        <ol class="steps">
+          <li>単語帳のスプレッドシートを開き、「拡張機能 → Apps Script」を開きます。</li>
+          <li>下のボタンでコードをコピーし、Code.gs の中身を置き換えます。コードの書き換えは要りません。</li>
+          <li>「デプロイ → 新しいデプロイ → ウェブアプリ」で、実行ユーザーを「自分」、アクセスできるユーザーを「全員」にしてデプロイします。</li>
+          <li>表示された URL（<code>/exec</code> で終わるもの）を、このファイル冒頭の <code>BOOKS</code> に、スプレッドシートの名前と一緒に1行で書いて保存します。</li>
+          <li>スプレッドシートが複数あるときは、それぞれで1〜3を行い、<code>BOOKS</code> の行を増やします。コードはどれも同じものです。</li>
+        </ol>
+        <p class="muted" style="font-size:.85rem">「全員」にしても、読めるのはそのスプレッドシートのA〜C列だけです。URLを知っている人は単語を読めるので、URLは人に教えないでください。</p>
+        <div><button class="btn" id="copyGas" type="button">Apps Scriptのコードをコピー</button></div>
+        <p class="status" id="copyStatus" role="status"></p>
+        <pre class="code" id="gasShow"></pre>
+      </div>
+    </details>
 
-    // --- 2. パスワード＆認証機能 ---
-    const HASHED_PASSWORD = "fd03cc421401680442f3967168dad805dbdd1de1db0cd2678b84c14a12be2e64";
+    <p class="foot">読み込んだ単語はこのブラウザの中だけに保存され、外には送られません。</p>
+  </section>
 
-    async function sha256(str) {
-      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  <!-- SESSION -->
+  <section id="session" hidden>
+    <div class="s-bar">
+      <button class="link" id="quit" type="button">← やめる</button>
+      <span class="prog" id="progText"></span>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+
+    <div id="flash" hidden>
+      <div style="display:grid; gap:20px">
+        <div class="flip" id="flipper" role="button" tabindex="0" aria-label="カードをめくる">
+          <div class="inner">
+            <div class="face front">
+              <span class="tag">No. <span id="fNo"></span></span>
+              <span class="word" id="fEn"></span>
+              <span class="cue">タップでめくる</span>
+            </div>
+            <div class="face back">
+              <span class="tag">和訳</span>
+              <span class="ja" id="fJa"></span>
+              <span class="word-small" id="fEn2"></span>
+            </div>
+          </div>
+        </div>
+        <div class="speakrow">
+          <button class="btn" id="speakFlash" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            発音を聞く
+          </button>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="reveal" type="button">答えを見る <kbd>→</kbd></button>
+          <div class="pair" id="judge" hidden>
+            <button class="btn" id="again" type="button"><kbd>←</kbd> もう一度</button>
+            <button class="btn primary" id="known" type="button">覚えた <kbd>→</kbd></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form id="quiz" hidden autocomplete="off">
+      <div class="card">
+        <span class="tag">No. <span id="qNo"></span> ・ 英語で入力</span>
+        <span class="ja big" id="qJa"></span>
+        <span class="cue" id="qLen"></span>
+      </div>
+      <label class="sr" for="ans">英単語</label>
+      <input id="ans" type="text" lang="en" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="英単語を入力">
+      <div class="hintline" id="hintLine" aria-live="polite"></div>
+      <div class="fb" id="fb" hidden role="status"></div>
+      <div class="actions">
+        <button class="btn" id="hintBtn" type="button">ヒント</button>
+        <button class="btn" id="skipBtn" type="button">わからない</button>
+        <button class="btn primary" id="submitBtn" type="submit">答える</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" hidden>
+    <div style="display:grid; gap:8px">
+      <p class="eyebrow" id="rMode"></p>
+      <p class="score"><span id="rScore"></span><small> / <span id="rTotal"></span></small></p>
+      <p id="rMsg" style="margin:0"></p>
+    </div>
+    <div id="missedWrap" style="display:grid; gap:10px" hidden>
+      <p class="eyebrow">間違えた単語</p>
+      <div class="missed" id="missed"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="retryMissed" type="button">間違えた単語だけもう一度</button>
+      <button class="btn" id="retryAll" type="button">同じ設定でもう一度</button>
+      <button class="btn" id="toHome" type="button">ホームへ</button>
+    </div>
+  </section>
+</div>
+
+<script type="text/plain" id="gasSrc">
+// マイ単語帳 用 Apps Script
+// 単語帳のスプレッドシートごとに、このコードをそのまま貼り付けてウェブアプリとしてデプロイします。
+// 書き換える場所はありません。
+
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  try {
+    if (p.action === 'sheets') {
+      return json_({ sheets: SpreadsheetApp.getActiveSpreadsheet().getSheets().map(s => s.getName()) });
     }
+    if (p.action === 'deck') return json_(deck_(p.sheet));
+    return json_({ error: 'action が指定されていません' });
+  } catch (err) {
+    return json_({ error: String((err && err.message) || err) });
+  }
+}
 
-    async function submitPassword() {
-      const input = document.getElementById('passInput').value;
-      const errEl = document.getElementById('authError');
-      
-      // ① 未入力のチェック
-      if (!input) {
-        errEl.innerText = "❌ パスワードが未入力です";
-        errEl.classList.remove('hidden');
-        return;
-      }
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
-      const hash = await sha256(input);
-      if (hash === HASHED_PASSWORD) {
-        sessionStorage.setItem('app_authenticated', 'true');
-        errEl.classList.add('hidden');
-        document.getElementById('authPanel').classList.add('hidden');
-        document.getElementById('mainContainer').classList.remove('hidden');
-        initAppContent();
-      } else {
-        // ② 間違っているときのチェック
-        errEl.innerText = "❌ パスワードが違います";
-        errEl.classList.remove('hidden');
-      }
+// A〜C列だけを読みます（D列以降は読みません）。
+// sheet を省略すると、単語が入っている最初のシートを使います。
+function deck_(sheet) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = sheet ? [ss.getSheetByName(sheet)] : ss.getSheets();
+  for (const sh of sheets) {
+    if (!sh) throw new Error('シートが見つかりません: ' + sheet);
+    const last = sh.getLastRow();
+    if (last < 1) continue;
+    const rows = sh.getRange(1, 1, last, 3).getDisplayValues();
+    if (sheet || rows.some(r => String(r[1]).trim() && String(r[2]).trim())) {
+      return { sheet: sh.getName(), rows: rows };
     }
+  }
+  return { sheet: sheet || '', rows: [] };
+}
+</script>
+<script>
+/* ====================== 設定 ======================
+   スプレッドシートごとに、名前（画面に出る表示名）と、デプロイ後のURL（…/exec で終わるもの）を
+   1行で書いてください。行を足すと、画面のプルダウンに増えます。
+   url が空の行は無視されます。すべて空なら自動読み込みは使わず、
+   貼り付け・ファイルの手動読み込みだけが使えます。
+==================================================== */
+var BOOKS = [
+  { name: 'ex準1級', url: 'https://script.google.com/macros/s/AKfycbzjQ76R2n7owZY3K8cpNg4Pr4XcvLi_k7BLE2V56DlGcT9e_ALaY97Llqld0U4XCtli8w/exec' },
+  { name: 'LEAP', url: 'https://script.google.com/macros/s/AKfycbx73Vqv_aX-GKC2sMhU_gpHJZA8igNk-HB-bnjVBay7gDmcJvlD2mvX5G7b41A8iAN6/exec' }
+];
 
-    function checkAuthOnStart() {
-      if (sessionStorage.getItem('app_authenticated') === 'true') {
-        document.getElementById('authPanel').classList.add('hidden');
-        document.getElementById('mainContainer').classList.remove('hidden');
-        initAppContent();
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+  var KEY = 'tangocho:v1';
+  var SAMPLE = [
+    [1,'abandon','捨てる、見捨てる'],[2,'ability','能力'],[3,'achieve','達成する'],[4,'adopt','採用する、養子にする'],
+    [5,'ancient','古代の'],[6,'benefit','利益、恩恵'],[7,'brief','短い、簡潔な'],[8,'concern','心配、関心事'],
+    [9,'declare','宣言する'],[10,'efficient','効率的な'],[11,'frequent','頻繁な'],[12,'maintain','維持する']
+  ].map(function(r){ return {n:r[0], en:r[1], ja:r[2]}; });
+
+  var deck = [], srcLabel = '', isSample = true;
+  var wb = null, fileName = '';
+  var session = null, lastMode = 'flash';
+  var curStatus = '#status';
+
+  /* ---------- helpers ---------- */
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function norm(s){ return String(s).normalize('NFKC').trim().toLowerCase().replace(/[‘’]/g,"'").replace(/\s+/g,' '); }
+  function shuffled(a){ a = a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  function setStatus(msg, kind){ var el=$(curStatus); el.textContent=msg; el.className='status'+(kind?' '+kind:''); }
+
+  /* ---------- storage (per-browser convenience) ---------- */
+  function save(){
+    try{
+      localStorage.setItem(KEY, JSON.stringify({deck:deck, src:srcLabel, sample:isSample,
+        settings:{from:$('#from').value, to:$('#to').value, shuffle:$('#shuffle').checked,
+          tts:$('#tts').checked, rate:$('#rate').value, voice:$('#voice').value}}));
+    }catch(e){}
+  }
+  function restore(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return false;
+      var o = JSON.parse(raw);
+      if(!o || !Array.isArray(o.deck) || !o.deck.length) return false;
+      deck = o.deck; srcLabel = o.src || ''; isSample = !!o.sample;
+      if(o.settings){ $('#from').value = o.settings.from || ''; $('#to').value = o.settings.to || ''; $('#shuffle').checked = o.settings.shuffle !== false;
+        $('#tts').checked = o.settings.tts !== false;
+        if(o.settings.rate) $('#rate').value = o.settings.rate;
+        savedVoice = o.settings.voice || '';
       }
-    }
+      return true;
+    }catch(e){ return false; }
+  }
 
-    // --- 3. データ定義・オフラインストレージ ---
-    const BOOKS = {
-      "book1": {
-        name: "LEAP",
-        url: "https://script.google.com/macros/s/AKfycby-Pr9I4XAzpu9fbNclaQ8TpL7rtKpBilXDG8fOKdSFfaW14Lv_N5sXooeuKqTM3_Phwg/exec",
-      },
-      "book2": {
-        name: "ex_準1級",
-        url: "https://script.google.com/macros/s/AKfycbx80tnxa-MvjDx02vJbrZb_syt-OTjMGh0yFbvCDdNny1KLAR1zZ-_qQKhGuVZr3I5tIQ/exec",
+  /* ---------- parsing: only columns A, B, C ---------- */
+  function parseDelimited(text){
+    text = text.replace(/^﻿/, '');
+    var delim = text.indexOf('\t') >= 0 ? '\t' : ',';
+    var rows = [], row = [], cell = '', q = false;
+    for(var i=0;i<text.length;i++){
+      var c = text[i];
+      if(q){
+        if(c === '"'){ if(text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+        else cell += c;
+      }else if(c === '"' && cell === ''){ q = true; }
+      else if(c === delim){ row.push(cell); cell = ''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      }else cell += c;
+    }
+    if(cell !== '' || row.length){ row.push(cell); rows.push(row); }
+    return rows;
+  }
+  function rowsToDeck(rows){
+    var out = [];
+    rows.forEach(function(r, idx){
+      var a = String(r[0] == null ? '' : r[0]).normalize('NFKC').trim();
+      var b = String(r[1] == null ? '' : r[1]).trim();
+      var c = String(r[2] == null ? '' : r[2]).trim();
+      if(!b || !c) return;
+      var n = Number(a.replace(/,/g,''));
+      if(a === '' || isNaN(n)){
+        if(idx === 0 && a !== '') return; /* header row */
+        n = out.length + 1;
       }
-    };
-
-    let currentBookKey = "book1";
-    let allWords = [];
-    let activeItems = [];
-    let filteredRangeItems = [];
-    let incorrectItems = [];
-    let currentIndex = 0;
-    let isFlipped = false;
-    let correctCount = 0;
-    let isProcessingAnswer = false;
-
-    async function initAppContent() {
-      setupBookDropdown();
-      await loadCurrentBookData();
+      out.push({n:n, en:b, ja:c});
+    });
+    return out;
+  }
+  function applyRows(rows, label, keepRange){
+    var d = rowsToDeck(rows);
+    if(!d.length){
+      setStatus('A〜C列から単語を読み取れませんでした。A列に番号、B列に英単語、C列に和訳が入っているか確認してください。', 'err');
+      return false;
     }
+    deck = d; srcLabel = label; isSample = false;
+    if(!keepRange){ $('#from').value = ''; $('#to').value = ''; }
+    save(); refreshHome();
+    setStatus(d.length + '語を読み込みました。', 'ok');
+    return true;
+  }
 
-    function setupBookDropdown() {
-      const select = document.getElementById('bookSelect');
-      select.innerHTML = '';
-      Object.keys(BOOKS).forEach(key => {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.innerText = BOOKS[key].name;
-        select.appendChild(opt);
-      });
-      select.value = currentBookKey;
-    }
+  /* ---------- home ---------- */
+  function filtered(){
+    var f = parseFloat($('#from').value), t = parseFloat($('#to').value);
+    return deck.filter(function(d){ return (isNaN(f) || d.n >= f) && (isNaN(t) || d.n <= t); });
+  }
+  function refreshHome(){
+    $('#count').textContent = deck.length;
+    $('#deckSrc').textContent = isSample ? 'サンプルの単語です。下から自分のスプレッドシートを読み込めます。' : srcLabel;
+    var ns = deck.map(function(d){ return d.n; });
+    $('#from').placeholder = String(Math.min.apply(null, ns));
+    $('#to').placeholder = String(Math.max.apply(null, ns));
+    $('#rangeCount').textContent = 'この範囲: ' + filtered().length + '語';
+    $('#startMsg').textContent = '';
+  }
+  ['#from','#to'].forEach(function(s){ $(s).addEventListener('input', function(){ refreshHome(); save(); }); });
+  $('#shuffle').addEventListener('change', save);
 
-    async function switchBook() {
-      currentBookKey = document.getElementById('bookSelect').value;
-      document.getElementById('loading').classList.remove('hidden');
-      document.getElementById('app').classList.add('hidden');
-      await loadCurrentBookData();
-    }
+  function show(view){
+    ['home','session','result'].forEach(function(id){ $('#'+id).hidden = id !== view; });
+    window.scrollTo(0,0);
+  }
 
-    async function loadCurrentBookData() {
-      const book = BOOKS[currentBookKey];
-      if (!book || !book.url) return;
+  /* ---------- loader ---------- */
+  function pickTab(paste){
+    $('#tabPaste').setAttribute('aria-selected', paste);
+    $('#tabFile').setAttribute('aria-selected', !paste);
+    $('#panePaste').hidden = !paste;
+    $('#paneFile').hidden = paste;
+    setStatus('');
+  }
+  $('#tabPaste').addEventListener('click', function(){ pickTab(true); });
+  $('#tabFile').addEventListener('click', function(){ pickTab(false); });
 
-      if (!navigator.onLine) {
-        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。インターネット接続を確認してください。</p>';
-        return;
-      }
+  $('#loadPaste').addEventListener('click', function(){
+    curStatus = '#status';
+    var t = $('#paste').value;
+    if(!t.trim()){ setStatus('貼り付け欄が空です。', 'err'); return; }
+    applyRows(parseDelimited(t), '貼り付けたデータ');
+  });
 
-      try {
-        const res = await fetch(book.url);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          allWords = data;
-          setupApp();
-        } else {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データが空です。</p>';
+  function loadSheet(name){
+    var rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:false, defval:''});
+    return applyRows(rows, fileName + ' / ' + name);
+  }
+  $('#sheet').addEventListener('change', function(){ if(wb) loadSheet($('#sheet').value); });
+
+  $('#file').addEventListener('change', function(){
+    curStatus = '#status';
+    var f = this.files[0];
+    if(!f) return;
+    fileName = f.name;
+    f.arrayBuffer().then(function(buf){
+      var ext = f.name.split('.').pop().toLowerCase();
+      if(ext === 'xlsx' || ext === 'xls'){
+        if(!window.XLSX){ setStatus('Excelファイルを読む部品を読み込めませんでした。CSVで保存し直すか、貼り付けをお試しください。', 'err'); return; }
+        wb = XLSX.read(buf, {type:'array'});
+        var sel = $('#sheet');
+        sel.innerHTML = wb.SheetNames.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+        $('#sheetRow').hidden = wb.SheetNames.length < 2;
+        /* choose the first sheet that has words */
+        for(var i=0;i<wb.SheetNames.length;i++){
+          var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], {header:1, raw:false, defval:''});
+          if(rowsToDeck(rows).length){ sel.selectedIndex = i; loadSheet(wb.SheetNames[i]); return; }
         }
-      } catch (e) {
-        console.warn('GAS通信失敗:', e);
-        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
+        setStatus('どのシートからも単語を読み取れませんでした。A列に番号、B列に英単語、C列に和訳が入っているか確認してください。', 'err');
+      }else{
+        wb = null; $('#sheetRow').hidden = true;
+        var text;
+        try{ text = new TextDecoder('utf-8', {fatal:true}).decode(buf); }
+        catch(e){ text = new TextDecoder('shift_jis').decode(buf); }
+        applyRows(parseDelimited(text), f.name);
       }
-    }
+    }).catch(function(){ setStatus('ファイルを読み込めませんでした。', 'err'); });
+  });
 
-    function reloadBookData() {
-      document.getElementById('loading').classList.remove('hidden');
-      document.getElementById('app').classList.add('hidden');
-      loadCurrentBookData();
-    }
-    
-    function setupApp() {
-      document.getElementById('rangeFrom').value = 1;
-      document.getElementById('rangeTo').value = allWords.length;
-      document.getElementById('bookStatus').innerText = `登録数: ${allWords.length} 語`;
-      applyRangeFilter();
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      updateOfflineStatus(!navigator.onLine);
-    }
+  /* ---------- sessions ---------- */
+  function buildItems(){
+    var items = filtered();
+    return $('#shuffle').checked ? shuffled(items) : items;
+  }
+  function begin(mode, items){
+    if(!items.length){ $('#startMsg').textContent = 'この範囲には単語がありません。開始と終了の番号を見直してください。'; return; }
+    lastMode = mode;
+    session = {mode:mode, items:items, i:0, res:new Array(items.length).fill(null), flipped:false, revealed:false, checked:false, hint:0};
+    show('session');
+    render();
+  }
+  $('#startFlash').addEventListener('click', function(){ begin('flash', buildItems()); });
+  $('#startQuiz').addEventListener('click', function(){ begin('quiz', buildItems()); });
+  $('#quit').addEventListener('click', function(){ session = null; show('home'); });
+  $('#toHome').addEventListener('click', function(){ session = null; show('home'); });
+  $('#retryAll').addEventListener('click', function(){ begin(lastMode, buildItems()); });
+  $('#retryMissed').addEventListener('click', function(){
+    var s = session; if(!s) return;
+    begin(s.mode, s.items.filter(function(_, i){ return !s.res[i]; }));
+  });
 
-    // --- 4. フィルター・セッション管理 ---
-    function applyRangeFilter() {
-      applyRangeFilterInternal();
-      restartSession();
+  function render(){
+    var s = session, it = s.items[s.i];
+    $('#progText').textContent = (s.i + 1) + ' / ' + s.items.length;
+    $('#meterFill').style.width = (s.i / s.items.length * 100) + '%';
+    if(s.mode === 'flash'){
+      $('#quiz').hidden = true; $('#flash').hidden = false;
+      var inner = $('#flipper .inner');
+      inner.style.transition = 'none';
+      $('#flipper').classList.remove('flipped');
+      void inner.offsetWidth;
+      inner.style.transition = '';
+      s.flipped = false; s.revealed = false;
+      $('#fNo').textContent = it.n;
+      $('#fEn').textContent = it.en;
+      $('#fJa').textContent = it.ja;
+      $('#fEn2').textContent = it.en;
+      $('#reveal').hidden = false; $('#judge').hidden = true;
+      speak(it.en);
+    }else{
+      $('#flash').hidden = true; $('#quiz').hidden = false;
+      s.checked = false; s.hint = 0;
+      $('#qNo').textContent = it.n;
+      $('#qJa').textContent = it.ja;
+      $('#qLen').textContent = it.en.length + '文字';
+      var a = $('#ans'); a.value = ''; a.readOnly = false;
+      $('#hintLine').textContent = '';
+      $('#fb').hidden = true;
+      $('#hintBtn').disabled = false; $('#skipBtn').disabled = false;
+      $('#submitBtn').textContent = '答える';
+      a.focus();
     }
+  }
+  function next(){
+    var s = session; s.i++;
+    if(s.i >= s.items.length) finish(); else render();
+  }
 
-    function applyRangeFilterInternal() {
-      const from = parseInt(document.getElementById('rangeFrom').value) || 1;
-      const to = parseInt(document.getElementById('rangeTo').value) || allWords.length;
+  /* flashcard */
+  function flip(on){
+    var s = session; if(!s || s.mode !== 'flash') return;
+    s.flipped = on === undefined ? !s.flipped : on;
+    $('#flipper').classList.toggle('flipped', s.flipped);
+    if(s.flipped){ s.revealed = true; $('#reveal').hidden = true; $('#judge').hidden = false; }
+  }
+  function mark(ok){ var s = session; if(!s || !s.revealed) return; s.res[s.i] = ok; next(); }
+  $('#flipper').addEventListener('click', function(){ flip(); });
+  $('#flipper').addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); flip(); } });
+  $('#reveal').addEventListener('click', function(){ flip(true); });
+  $('#again').addEventListener('click', function(){ mark(false); });
+  $('#known').addEventListener('click', function(){ mark(true); });
+  document.addEventListener('keydown', function(e){
+    var s = session;
+    if(!s || s.mode !== 'flash' || $('#session').hidden) return;
+    if(e.target.matches('input,textarea,select')) return;
+    if(e.key === 'ArrowRight'){ e.preventDefault(); if(s.revealed) mark(true); else flip(true); }
+    else if(e.key === 'ArrowLeft' && s.revealed){ e.preventDefault(); mark(false); }
+    else if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); flip(); }
+  });
 
-      filteredRangeItems = allWords.filter(w => w.no >= from && w.no <= to);
-    }
+  /* typing quiz */
+  function showFeedback(ok, userRaw, silent){
+    var s = session, it = s.items[s.i];
+    var fb = $('#fb');
+    fb.hidden = false;
+    fb.className = 'fb ' + (ok ? 'ok' : 'ng');
+    var html = '<strong class="' + (ok ? 'ok' : 'ng') + '">' + (ok ? '正解' : '不正解') + '</strong><span class="ans-word">' + esc(it.en) + '</span>';
+    if(!ok && userRaw) html += '<span class="yours">あなたの入力: ' + esc(userRaw) + '</span><button type="button" class="link" id="override">正解として数える</button>';
+    if(TTS_OK) html += '<button type="button" class="link" id="speakAns">もう一度聞く</button>';
+    fb.innerHTML = html;
+    s.checked = true;
+    $('#ans').readOnly = true;
+    $('#hintBtn').disabled = true; $('#skipBtn').disabled = true;
+    $('#submitBtn').textContent = s.i === s.items.length - 1 ? '結果を見る' : '次へ';
+    $('#submitBtn').focus();
+    if(!silent) speak(it.en);
+  }
+  $('#fb').addEventListener('click', function(e){
+    if(!session) return;
+    if(e.target.id === 'override'){ session.res[session.i] = true; showFeedback(true, '', true); }
+    else if(e.target.id === 'speakAns'){ speak(session.items[session.i].en, true); }
+  });
+  $('#quiz').addEventListener('submit', function(e){
+    e.preventDefault();
+    var s = session; if(!s) return;
+    if(s.checked){ next(); return; }
+    var raw = $('#ans').value;
+    if(!norm(raw)){ $('#ans').focus(); return; }
+    var ok = norm(raw) === norm(s.items[s.i].en);
+    s.res[s.i] = ok;
+    showFeedback(ok, raw.trim());
+  });
+  $('#skipBtn').addEventListener('click', function(){
+    var s = session; if(!s || s.checked) return;
+    s.res[s.i] = false;
+    showFeedback(false, '');
+  });
+  $('#hintBtn').addEventListener('click', function(){
+    var s = session; if(!s || s.checked) return;
+    s.hint++;
+    var w = s.items[s.i].en, shown = 0;
+    $('#hintLine').textContent = w.split('').map(function(ch){
+      if(ch === ' ') return '  ';
+      shown++;
+      return shown <= s.hint ? ch : '_';
+    }).join(' ');
+    $('#ans').focus();
+  });
 
-    function restartSession() {
-      applyRangeFilterInternal();
-      activeItems = [...filteredRangeItems];
-      currentIndex = 0;
-      correctCount = 0;
-      incorrectItems = [];
-      isProcessingAnswer = false;
-      document.getElementById('completePanel').classList.add('hidden');
-      renderItem();
-    }
+  /* result */
+  function finish(){
+    var s = session;
+    $('#meterFill').style.width = '100%';
+    var good = s.res.filter(Boolean).length, total = s.items.length;
+    var missed = s.items.filter(function(_, i){ return !s.res[i]; });
+    $('#rMode').textContent = s.mode === 'flash' ? 'フラッシュカード　英語 → 日本語' : '入力テスト　日本語 → 英語';
+    $('#rScore').textContent = good;
+    $('#rTotal').textContent = total;
+    $('#rMsg').textContent = missed.length ? (s.mode === 'flash' ? '覚えた単語が ' + good + ' 語、もう一度見る単語が ' + missed.length + ' 語です。' : missed.length + ' 語を間違えました。') : '全部できました。';
+    $('#missedWrap').hidden = !missed.length;
+    $('#retryMissed').hidden = !missed.length;
+    $('#missed').innerHTML = missed.map(function(d){
+      return '<div><span class="n">' + esc(d.n) + '</span><span class="e">' + esc(d.en) + '</span><span class="j">' + esc(d.ja) + '</span></div>';
+    }).join('');
+    show('result');
+  }
 
-    function shuffleAndRestart() {
-      applyRangeFilterInternal();
-      activeItems = [...filteredRangeItems];
-      for (let i = activeItems.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [activeItems[i], activeItems[j]] = [activeItems[j], activeItems[i]];
+  /* ---------- speech (the device's own voices) ---------- */
+  var TTS_OK = 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  var voices = [], savedVoice = '';
+  function langOf(v){ return String(v.lang || '').replace('_', '-'); }
+  function loadVoices(){
+    if(!TTS_OK) return;
+    voices = speechSynthesis.getVoices().filter(function(v){ return /^en/i.test(v.lang); });
+    var sel = $('#voice'), cur = sel.value || savedVoice;
+    sel.innerHTML = voices.map(function(v){ return '<option value="'+esc(v.name)+'">'+esc(v.name)+' ('+esc(langOf(v))+')</option>'; }).join('');
+    $('#voiceRow').hidden = !voices.length;
+    if(!voices.length) return;
+    var pick = voices.filter(function(v){ return v.name === cur; })[0]
+      || voices.filter(function(v){ return langOf(v) === 'en-US'; })[0] || voices[0];
+    sel.value = pick.name;
+  }
+  function speak(text, force){
+    if(!TTS_OK || (!force && !$('#tts').checked)) return;
+    try{
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      var name = $('#voice').value;
+      var v = voices.filter(function(x){ return x.name === name; })[0];
+      if(v){ u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
+      u.rate = parseFloat($('#rate').value) || 0.9;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  function initVoices(){
+    if(!TTS_OK){ $('#ttsBox').hidden = true; $('#speakFlash').hidden = true; return; }
+    loadVoices();
+    if(speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    else speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  $('#tts').addEventListener('change', save);
+  $('#rate').addEventListener('change', function(){ save(); speak('vocabulary', true); });
+  $('#voice').addEventListener('change', function(){ save(); speak('vocabulary', true); });
+  $('#speakFlash').addEventListener('click', function(){ if(session) speak(session.items[session.i].en, true); });
+
+  /* ---------- Google Apps Script web apps (BOOKS) ---------- */
+  var GKEY = 'tangocho:gas';
+  var books = BOOKS.filter(function(b){ return b && /^https:\/\//.test(b.url || ''); })
+    .map(function(b, i){ return {name: b.name || ('スプレッドシート' + (i + 1)), url: b.url}; });
+  var FAIL = '読み込めませんでした。名前とURLの設定と、デプロイの「アクセスできるユーザー: 全員」を確認してください。';
+  function api(url, params){
+    var u = new URL(url);
+    Object.keys(params).forEach(function(k){ if(params[k] != null) u.searchParams.set(k, params[k]); });
+    return fetch(u.toString()).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.error) throw new Error(j.error);
+      return j;
+    });
+  }
+  function errText(e){ return e && e.message ? ' (' + e.message + ')' : ''; }
+  function curBook(){ return books[parseInt($('#gBook').value, 10)] || books[0]; }
+  function fillSheets(names, want){
+    $('#gSheet').innerHTML = names.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+    if(want && names.indexOf(want) >= 0) $('#gSheet').value = want;
+  }
+  function loadGas(keepRange, wantSheet){
+    curStatus = '#gStatus';
+    setStatus('読み込み中…');
+    var b = curBook();
+    return api(b.url, {action:'deck', sheet:wantSheet}).then(function(j){
+      var sheet = j.sheet || wantSheet || '';
+      if(sheet) $('#gSheet').value = sheet;
+      if(applyRows(j.rows || [], b.name + ' / ' + sheet, keepRange)){
+        try{ localStorage.setItem(GKEY, JSON.stringify({book:b.name, sheet:sheet})); }catch(e){}
       }
-      currentIndex = 0;
-      correctCount = 0;
-      incorrectItems = [];
-      isProcessingAnswer = false;
-      document.getElementById('completePanel').classList.add('hidden');
-      renderItem();
+    }).catch(function(e){ setStatus(FAIL + errText(e), 'err'); });
+  }
+  function openBook(wantSheet){
+    curStatus = '#gStatus';
+    setStatus('読み込み中…');
+    return api(curBook().url, {action:'sheets'}).then(function(j){
+      var names = j.sheets || [];
+      fillSheets(names, wantSheet);
+      var ok = !!wantSheet && names.indexOf(wantSheet) >= 0;
+      return loadGas(ok, ok ? wantSheet : undefined);
+    }).catch(function(e){ setStatus(FAIL + errText(e), 'err'); });
+  }
+  function initGas(){
+    $('#gBook').innerHTML = books.map(function(b, i){ return '<option value="'+i+'">'+esc(b.name)+'</option>'; }).join('');
+    $('#gBookRow').hidden = books.length < 2;
+    var saved = {};
+    try{ saved = JSON.parse(localStorage.getItem(GKEY)) || {}; }catch(e){}
+    var si = -1;
+    books.forEach(function(b, i){ if(si < 0 && b.name === saved.book) si = i; });
+    if(si >= 0) $('#gBook').value = String(si);
+    $('#gBook').addEventListener('change', function(){ openBook(); });
+    $('#gSheet').addEventListener('change', function(){ loadGas(false, $('#gSheet').value); });
+    $('#gReload').addEventListener('click', function(){ loadGas(true, $('#gSheet').value); });
+    openBook(si >= 0 ? saved.sheet : undefined);
+  }
+
+  /* ---------- copy the embedded Apps Script ---------- */
+  $('#copyGas').addEventListener('click', function(){
+    var box = $('#gasShow'), st = $('#copyStatus');
+    function fallback(){
+      var r = document.createRange(); r.selectNodeContents(box);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      st.className = 'status'; st.textContent = 'コードを選択しました。コピーしてください。';
     }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(box.textContent).then(function(){
+        st.className = 'status ok'; st.textContent = 'コピーしました。';
+      }, fallback);
+    }else fallback();
+  });
 
-    function startIncorrectOnly() {
-      if (incorrectItems.length === 0) return;
-      activeItems = [...incorrectItems];
-      currentIndex = 0;
-      correctCount = 0;
-      incorrectItems = [];
-      isProcessingAnswer = false;
-      document.getElementById('completePanel').classList.add('hidden');
-      renderItem();
-    }
-
-    // --- 5. 画面描画 & インタラクション ---
-    function renderItem() {
-      if (activeItems.length === 0) return;
-
-      if (currentIndex >= activeItems.length) {
-        document.getElementById('flashcardArea').classList.add('hidden');
-        document.getElementById('typingArea').classList.add('hidden');
-        document.getElementById('completePanel').classList.remove('hidden');
-        
-        document.getElementById('scoreSummary').innerText = `スコア: ${correctCount} / ${activeItems.length} 問正解 (不正解: ${incorrectItems.length} 問)`;
-        document.getElementById('counter').innerText = `${activeItems.length} / ${activeItems.length} (完了)`;
-
-        const retryBtn = document.getElementById('retryIncorrectBtn');
-        if (incorrectItems.length === 0) {
-          retryBtn.classList.add('hidden');
-        } else {
-          retryBtn.classList.remove('hidden');
-          retryBtn.innerText = `❌ 不正解の ${incorrectItems.length} 語だけやり直す`;
-        }
-        return;
-      }
-
-      const item = activeItems[currentIndex];
-      const mode = document.getElementById('modeSelect').value;
-
-      document.getElementById('counter').innerText = `${currentIndex + 1} / ${activeItems.length}`;
-
-      if (mode === 'flashcard') {
-        document.getElementById('typingArea').classList.add('hidden');
-        document.getElementById('flashcardArea').classList.remove('hidden');
-
-        if (isFlipped) {
-          isFlipped = false;
-          document.getElementById('flashcard').classList.remove('flipped');
-        }
-
-        document.getElementById('cardNoLabel').innerText = `No. ${item.no}`;
-        document.getElementById('cardWordText').innerText = item.word;
-        document.getElementById('cardMeaningText').innerText = item.meaning;
-      } else {
-        document.getElementById('flashcardArea').classList.add('hidden');
-        document.getElementById('typingArea').classList.remove('hidden');
-
-        const resEl = document.getElementById('resultMessage');
-        resEl.innerText = '';
-        resEl.style.backgroundColor = 'transparent';
-
-        document.getElementById('typingNoLabel').innerText = `No. ${item.no}`;
-        document.getElementById('typingQuestionText').innerText = item.meaning;
-        const inputEl = document.getElementById('userInput');
-        inputEl.value = '';
-        inputEl.focus();
-      }
-    }
-
-    function flipCard() {
-      const cardEl = document.getElementById('flashcard');
-      isFlipped = !isFlipped;
-      cardEl.classList.toggle('flipped', isFlipped);
-    }
-
-    function handleCardAnswer(isCorrect) {
-      if (activeItems.length === 0 || currentIndex >= activeItems.length) return;
-      const item = activeItems[currentIndex];
-
-      if (isCorrect) correctCount++;
-      else incorrectItems.push(item);
-
-      currentIndex++;
-      renderItem();
-    }
-
-    function checkTypingAnswer() {
-      if (isProcessingAnswer || activeItems.length === 0 || currentIndex >= activeItems.length) return;
-
-      const item = activeItems[currentIndex];
-      const inputEl = document.getElementById('userInput');
-      const resEl = document.getElementById('resultMessage');
-
-      const userVal = inputEl.value.trim().toLowerCase();
-      const targetVal = item.word.trim().toLowerCase();
-
-      isProcessingAnswer = true;
-
-      if (userVal === targetVal) {
-        correctCount++;
-        resEl.style.color = "var(--success)";
-        resEl.style.backgroundColor = "#d1fae5";
-        resEl.style.padding = "6px";
-        resEl.style.borderRadius = "6px";
-        resEl.innerText = "⭕️ PERFECT!";
-        speakWord();
-
-        setTimeout(() => {
-          isProcessingAnswer = false;
-          currentIndex++;
-          renderItem();
-        }, 800);
-      } else {
-        incorrectItems.push(item);
-        resEl.style.color = "var(--error)";
-        resEl.style.backgroundColor = "#fee2e2";
-        resEl.style.padding = "6px";
-        resEl.style.borderRadius = "6px";
-        resEl.innerText = `❌ 不正解! (正解: ${item.word})`;
-
-        setTimeout(() => {
-          isProcessingAnswer = false;
-          currentIndex++;
-          renderItem();
-        }, 1600);
-      }
-    }
-
-    // --- 6. 音声読み上げ (SpeechSynthesis) ---
-    function speakWord() {
-      if (activeItems.length === 0 || currentIndex >= activeItems.length) return;
-      const item = activeItems[currentIndex];
-      if (!item.word || !('speechSynthesis' in window)) return;
-
-      window.speechSynthesis.cancel();
-      const uttr = new SpeechSynthesisUtterance(item.word);
-      uttr.lang = 'en-US';
-      uttr.rate = 0.85;
-
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Samantha') || v.name.includes('Karen') || v.name.includes('Google US English')));
-      if (preferred) uttr.voice = preferred;
-
-      window.speechSynthesis.speak(uttr);
-    }
-
-    // --- 7. オンライン/オフライン状態監視 ---
-    function updateOfflineStatus(isOffline) {
-      const badge = document.getElementById('offlineBadge');
-      if (isOffline) badge.classList.remove('hidden');
-      else badge.classList.add('hidden');
-    }
-
-    window.addEventListener('offline', () => updateOfflineStatus(true));
-    window.addEventListener('online', () => updateOfflineStatus(false));
-
-    checkAuthOnStart();
-  </script>
-</body>
-</html>
+  /* ---------- boot ---------- */
+  if(!restore()){ deck = SAMPLE; srcLabel = ''; isSample = true; }
+  refreshHome();
+  initVoices();
+  $('#gasShow').textContent = $('#gasSrc').textContent.replace(/^\s+|\s+$/g, '');
+  if(books.length){
+    $('#gasBox').hidden = false;
+    $('.foot').textContent = '単語はあなたのGoogleスプレッドシートから読み込みます。開くたびに最新の内容になります。';
+    initGas();
+  }else{
+    $('#setup').open = true;
+  }
+})();
+</script>
