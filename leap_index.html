@@ -73,7 +73,7 @@
         <input type="password" id="passInput" placeholder="パスワードを入力" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') submitPassword()">
       </div>
       <button onclick="submitPassword()" class="btn" style="width:100%;">ログイン</button>
-      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden"></div>
+      <div id="authError" style="color:var(--error); font-size:0.8rem; margin-top:12px; font-weight:bold;" class="hidden">❌ パスワードが違います</div>
     </div>
 
     <!-- 📚 メインアプリ画面 -->
@@ -117,7 +117,7 @@
 
         <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
           <span id="bookStatus" style="font-size: 0.7rem; color: var(--text-sub);"></span>
-          <button onclick="syncDataWithGAS()" class="btn btn-sync">🔄 データ再同期</button>
+          <button onclick="reloadBookData()" class="btn btn-sync">🔄 データ再同期</button>
         </div>
       </div>
 
@@ -275,14 +275,8 @@
     async function submitPassword() {
       const input = document.getElementById('passInput').value;
       const errEl = document.getElementById('authError');
-      
-      // ① 未入力のチェック
-      if (!input) {
-        errEl.innerText = "❌ パスワードが未入力です";
-        errEl.classList.remove('hidden');
-        return;
-      }
-    
+      if (!input) return;
+
       const hash = await sha256(input);
       if (hash === HASHED_PASSWORD) {
         sessionStorage.setItem('app_authenticated', 'true');
@@ -291,8 +285,6 @@
         document.getElementById('mainContainer').classList.remove('hidden');
         initAppContent();
       } else {
-        // ② 間違っているときのチェック
-        errEl.innerText = "❌ パスワードが違います";
         errEl.classList.remove('hidden');
       }
     }
@@ -301,7 +293,6 @@
       "book1": {
         name: "LEAP",
         url: "https://script.google.com/macros/s/AKfycby-Pr9I4XAzpu9fbNclaQ8TpL7rtKpBilXDG8fOKdSFfaW14Lv_N5sXooeuKqTM3_Phwg/exec",
-        storagekey: "my_LEAP"
       },
     };
 
@@ -347,72 +338,33 @@
     }
 
     async function loadCurrentBookData() {
-      // 選択された教材の storageKey を取得する
-      const book = BOOKS[currentBookKey];
-      const cacheKey = book.storageKey; 
-
-      const cachedData = localStorage.getItem(cacheKey);
-
-      if (cachedData) {
-        allWords = JSON.parse(cachedData);
-        setupApp();
-        if (navigator.onLine) fetchDataFromGAS(true);
-        else document.getElementById('offlineBadge').classList.remove('hidden');
-      } else {
-        if (navigator.onLine) await fetchDataFromGAS(false);
-        else {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。データがありません。</p>';
-        }
-      }
-    }
-
-    async function fetchDataFromGAS(isBackground = false) {
       const book = BOOKS[currentBookKey];
       if (!book || !book.url) return;
+
+      if (!navigator.onLine) {
+        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。インターネット接続を確認してください。</p>';
+        return;
+      }
 
       try {
         const res = await fetch(book.url);
         const data = await res.json();
         if (data && data.length > 0) {
           allWords = data;
-          // 保存時もそれぞれの storageKey を使う
-          localStorage.setItem(book.storageKey, JSON.stringify(data));
-          if (!isBackground) setupApp();
+          setupApp();
+        } else {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データが空です。</p>';
         }
       } catch (e) {
         console.warn('GAS通信失敗:', e);
-        if (!isBackground) {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
-        }
+        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
       }
     }
 
-    async function fetchDataFromGAS(isBackground = false) {
-      const book = BOOKS[currentBookKey];
-      if (!book || !book.url) return;
-
-      try {
-        const res = await fetch(book.url);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          allWords = data;
-          // 保存時もそれぞれの storageKey を使う
-          localStorage.setItem(book.storageKey, JSON.stringify(data));
-          if (!isBackground) setupApp();
-        }
-      } catch (e) {
-        console.warn('GAS通信失敗:', e);
-        if (!isBackground) {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
-        }
-      }
-    }
-
-    function syncDataWithGAS() {
-      if (!navigator.onLine) return alert('オフラインのため再同期できません。');
+    function reloadBookData() {
       document.getElementById('loading').classList.remove('hidden');
       document.getElementById('app').classList.add('hidden');
-      fetchDataFromGAS(false);
+      loadCurrentBookData();
     }
 
     function setupApp() {
