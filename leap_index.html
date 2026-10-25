@@ -166,7 +166,6 @@
             <button onclick="handleCardAnswer(false)" class="btn-incorrect">❌ 不正解</button>
             <button onclick="handleCardAnswer(true)" class="btn-correct">⭕️ 正解</button>
           </div>
-          <button onclick="shuffleCurrentSession()" class="btn btn-secondary" style="width:100%; margin-top:10px;">🔀 範囲内をシャッフルしてやり直す</button>
         </div>
 
         <!-- モード3 & 4: タイピング入力エリア -->
@@ -193,7 +192,6 @@
                 </div>
               </div>
               <div id="resultMessage" style="font-size: 0.85rem; font-weight: bold; min-height: 24px; text-align: center; margin-top:8px;"></div>
-              <button onclick="shuffleCurrentSession()" class="btn btn-secondary" style="width:100%; margin-top:10px;">🔀 範囲内をシャッフルしてやり直す</button>
             </div>
           </div>
         </div>
@@ -425,23 +423,6 @@
           }
         });
       }
-    }
-
-    function shuffleCurrentSession() {
-      if (filteredRangeWords.length === 0) return;
-      
-      // 範囲内の単語をコピーしてシャッフル
-      activeWords = [...filteredRangeWords];
-      for (let i = activeWords.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [activeWords[i], activeWords[j]] = [activeWords[j], activeWords[i]];
-      }
-    
-      currentIndex = 0;
-      correctCount = 0;
-      incorrectWords = [];
-      document.getElementById('completePanel').classList.add('hidden');
-      renderItem();
     }
 
     function restartSession() {
