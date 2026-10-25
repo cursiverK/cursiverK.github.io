@@ -118,7 +118,7 @@
 
         <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
           <span id="bookStatus" style="font-size: 0.75rem; color: var(--text-sub);"></span>
-          <button onclick="syncDataWithGAS()" class="btn btn-sync">🔄 再同期</button>
+          <button onclick="reloadBookData()" class="btn btn-sync">🔄 再同期</button>
         </div>
       </div>
 
@@ -292,12 +292,10 @@
       "book1": {
         name: "LEAP",
         url: "https://script.google.com/macros/s/AKfycby-Pr9I4XAzpu9fbNclaQ8TpL7rtKpBilXDG8fOKdSFfaW14Lv_N5sXooeuKqTM3_Phwg/exec",
-        storagekey: "my_LEAP"
       },
       "book2": {
         name: "ex_準1級",
         url: "https://script.google.com/macros/s/AKfycbx80tnxa-MvjDx02vJbrZb_syt-OTjMGh0yFbvCDdNny1KLAR1zZ-_qQKhGuVZr3I5tIQ/exec",
-        storagekey: "my_pre1"
       }
     };
 
@@ -336,53 +334,35 @@
     }
 
     async function loadCurrentBookData() {
-      // 選択された教材の storageKey を取得する
-      const book = BOOKS[currentBookKey];
-      const cacheKey = book.storageKey; 
-
-      const cachedData = localStorage.getItem(cacheKey);
-
-      if (cachedData) {
-        allWords = JSON.parse(cachedData);
-        setupApp();
-        if (navigator.onLine) fetchDataFromGAS(true);
-        else document.getElementById('offlineBadge').classList.remove('hidden');
-      } else {
-        if (navigator.onLine) await fetchDataFromGAS(false);
-        else {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。データがありません。</p>';
-        }
-      }
-    }
-
-    async function fetchDataFromGAS(isBackground = false) {
       const book = BOOKS[currentBookKey];
       if (!book || !book.url) return;
+
+      if (!navigator.onLine) {
+        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">オフラインです。インターネット接続を確認してください。</p>';
+        return;
+      }
 
       try {
         const res = await fetch(book.url);
         const data = await res.json();
         if (data && data.length > 0) {
           allWords = data;
-          // 保存時もそれぞれの storageKey を使う
-          localStorage.setItem(book.storageKey, JSON.stringify(data));
-          if (!isBackground) setupApp();
+          setupApp();
+        } else {
+          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データが空です。</p>';
         }
       } catch (e) {
         console.warn('GAS通信失敗:', e);
-        if (!isBackground) {
-          document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
-        }
+        document.getElementById('loading').innerHTML = '<p style="color:var(--error);">データの読み込みに失敗しました。</p>';
       }
     }
 
-    function syncDataWithGAS() {
-      if (!navigator.onLine) return alert('オフライン状態のため同期できません。');
+    function reloadBookData() {
       document.getElementById('loading').classList.remove('hidden');
       document.getElementById('app').classList.add('hidden');
-      fetchDataFromGAS(false);
+      loadCurrentBookData();
     }
-
+    
     function setupApp() {
       document.getElementById('rangeFrom').value = 1;
       document.getElementById('rangeTo').value = allWords.length;
