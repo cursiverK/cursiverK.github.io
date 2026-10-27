@@ -115,6 +115,14 @@
           </div>
         </div>
 
+        <!-- ランダム出題 -->
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--text-main);">
+            <input type="checkbox" id="shuffleCheck" onchange="restartSession()" style="width:18px; height:18px;">
+            🔀 ランダム出題（1周目から順番をシャッフル）
+          </label>
+        </div>
+
         <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
           <span id="bookStatus" style="font-size: 0.7rem; color: var(--text-sub);"></span>
           <button onclick="reloadBookData()" class="btn btn-sync">🔄 データ再同期</button>
@@ -204,7 +212,7 @@
           <div class="action-list">
             <button id="retryIncorrectBtn" onclick="startIncorrectOnly()" class="btn" style="background:var(--error); color:white;">❌ 不正解だった問題だけやり直す</button>
             <button onclick="shuffleAndRestart()" class="btn" style="background:#fef3c7; color:#b45309;">🔀 範囲内をシャッフルしてやり直す</button>
-            <button onclick="restartSession()" class="btn btn-secondary">▶️ 最初から順番にやり直す</button>
+            <button onclick="restartSession()" class="btn btn-secondary">▶️ 最初からやり直す（ランダム設定に従う）</button>
           </div>
         </div>
 
@@ -428,6 +436,13 @@
     function restartSession() {
       applyRangeFilterInternal();
       activeItems = [...filteredRangeItems];
+      const sc = document.getElementById('shuffleCheck');
+      if (sc && sc.checked) {
+        for (let i = activeItems.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [activeItems[i], activeItems[j]] = [activeItems[j], activeItems[i]];
+        }
+      }
       currentIndex = 0;
       correctCount = 0;
       incorrectItems = [];
